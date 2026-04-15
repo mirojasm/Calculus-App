@@ -1,0 +1,36 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: calculus-postgres
+    environment:
+      POSTGRES_USER: ${DB_USER:-admin}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-secret}
+      POSTGRES_DB: ${DB_NAME:-mydatabase}
+    ports:
+      - "${DB_PORT:-5435}:5432"
+    volumes:
+      - calculus_postgres_data:/var/lib/postgresql/data
+      - ./data/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-admin} -d ${DB_NAME:-mydatabase}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: .
+    container_name: calculus-backend
+    profiles: ["full"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+    ports:
+      - "${PORT:-3002}:3002"
+
+volumes:
+  calculus_postgres_data:
+    driver: local
