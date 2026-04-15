@@ -1,0 +1,28 @@
+{
+  "name": "calculus-backend",
+  "version": "1.0.0",
+  "description": "API Express para Calculus-App (auth, chat, análisis y persistencia).",
+  "main": "index.js",
+  "scripts": {
+    "dev": "node --watch index.js",
+    "start": "node index.js",
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down",
+    "db:logs": "docker compose logs -f postgres"
+  },
+  "engines": {
+    "node": ">=18.17"
+  },
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "express-openapi-validator": "^5.4.7",
+    "jsonwebtoken": "^9.0.3",
+    "openai": "^4.91.1",
+    "pg": "^8.14.1",
+    "swagger-ui-express": "^5.0.1",
+    "yamljs": "^0.3.0"
+  }
+}

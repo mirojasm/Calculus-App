@@ -1,0 +1,26 @@
+{
+  "name": "calculus-app",
+  "private": true,
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "setup": "node scripts/setup.js",
+    "db:up": "npm run db:up --workspace backend",
+    "db:down": "npm run db:down --workspace backend",
+    "db:logs": "npm run db:logs --workspace backend",
+    "dev": "concurrently -n backend,frontend -c blue,magenta \"npm run dev --workspace backend\" \"npm run dev --workspace frontend\"",
+    "dev:backend": "npm run dev --workspace backend",
+    "dev:frontend": "npm run dev --workspace frontend",
+    "build": "npm run build --workspace frontend",
+    "lint": "npm run lint --workspace frontend",
+    "start": "npm run db:up && npm run dev"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  },
+  "engines": {
+    "node": ">=18.17"
+  }
+}
