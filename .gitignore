@@ -18,3 +18,8 @@ build/
 
 # Claude Code local
 .claude/
+
+# Generated experiment data (large, reproducible)
+outputs/
+__pycache__/
+*.pyc

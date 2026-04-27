@@ -1,0 +1,79 @@
+"""
+Route OpenAI calls to the correct API by model family.
+
+  GPT-4.x        → Chat Completions API (client.chat.completions.create)
+  GPT-5.x / o*   → Responses API       (client.responses.create)
+
+Local vLLM override (set before running):
+  LOCAL_MODEL_BASE_URL  — base URL of vLLM server  (e.g. http://localhost:8000/v1)
+  LOCAL_MODEL_NAME      — model name passed to vLLM (default: Qwen/Qwen2.5-72B-Instruct-AWQ)
+  KEEP_REMOTE_MODELS    — comma-separated model names that always stay on OpenAI
+                          (default: gpt-4o-mini,gpt-4.1)
+When LOCAL_MODEL_BASE_URL is set every model NOT in KEEP_REMOTE_MODELS is routed to the
+local vLLM server using the Chat Completions protocol (vLLM does not expose the
+Responses API).
+"""
+import os
+from typing import List
+from openai import OpenAI
+from research.config import CFG
+
+# ── Remote (OpenAI) client ────────────────────────────────────────────────────
+_client = OpenAI(api_key=CFG.openai_api_key)
+_RESPONSES_PREFIXES = ("gpt-5", "o1", "o3", "o4")
+
+# ── Local vLLM routing ────────────────────────────────────────────────────────
+_LOCAL_BASE  = os.environ.get("LOCAL_MODEL_BASE_URL")
+_LOCAL_MODEL = os.environ.get("LOCAL_MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct-AWQ")
+_KEEP_REMOTE: set[str] = set(
+    os.environ.get("KEEP_REMOTE_MODELS", "gpt-4o-mini,gpt-4.1").split(",")
+)
+
+_local_client: OpenAI | None = (
+    OpenAI(base_url=_LOCAL_BASE, api_key="local") if _LOCAL_BASE else None
+)
+
+
+def _route(model: str) -> tuple[OpenAI, str, bool]:
+    """Return (client, effective_model_name, use_responses_api)."""
+    if _local_client is not None and model not in _KEEP_REMOTE:
+        return _local_client, _LOCAL_MODEL, False   # vLLM: Chat Completions only
+    return _client, model, any(model.startswith(p) for p in _RESPONSES_PREFIXES)
+
+
+def chat(
+    messages: List[dict],
+    model: str,
+    temperature: float = 0.0,
+    json_mode: bool = False,
+    max_tokens: int = 2000,
+) -> str:
+    """
+    Unified chat call. Accepts messages in Chat Completions format (role/content dicts).
+    Routes to Responses API for GPT-5/o-series, or to a local vLLM server when
+    LOCAL_MODEL_BASE_URL is set. Returns the assistant text content.
+    """
+    client, effective_model, use_responses = _route(model)
+
+    if use_responses:
+        kwargs: dict = dict(
+            model=effective_model,
+            input=messages,
+            max_output_tokens=max_tokens,
+            # no reasoning param: consumes output token budget silently on mini models
+        )
+        if json_mode:
+            kwargs["text"] = {"format": {"type": "json_object"}}
+        resp = client.responses.create(**kwargs)
+        return resp.output_text.strip()
+    else:
+        kwargs = dict(
+            model=effective_model,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            messages=messages,
+        )
+        if json_mode:
+            kwargs["response_format"] = {"type": "json_object"}
+        resp = client.chat.completions.create(**kwargs)
+        return resp.choices[0].message.content.strip()
