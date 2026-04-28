@@ -12,6 +12,10 @@ Local vLLM override (set before running):
 When LOCAL_MODEL_BASE_URL is set every model NOT in KEEP_REMOTE_MODELS is routed to the
 local vLLM server using the Chat Completions protocol (vLLM does not expose the
 Responses API).
+
+Groq routing (cheap alternative to OpenAI for semantic/generation tasks):
+  GROQ_API_KEY — if set, chat_groq() is available and used by CIDI M1/M4
+  GROQ_MODEL   — model to use on Groq (default: llama-3.3-70b-versatile)
 """
 import os
 from typing import List
@@ -31,6 +35,15 @@ _KEEP_REMOTE: set[str] = set(
 
 _local_client: OpenAI | None = (
     OpenAI(base_url=_LOCAL_BASE, api_key="local") if _LOCAL_BASE else None
+)
+
+# ── Groq routing (OpenAI-compatible, cheap/fast for Llama) ───────────────────
+_GROQ_KEY   = os.environ.get("GROQ_API_KEY")
+_GROQ_MODEL = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
+_GROQ_BASE  = "https://api.groq.com/openai/v1"
+
+_groq_client: OpenAI | None = (
+    OpenAI(base_url=_GROQ_BASE, api_key=_GROQ_KEY) if _GROQ_KEY else None
 )
 
 
@@ -77,3 +90,33 @@ def chat(
             kwargs["response_format"] = {"type": "json_object"}
         resp = client.chat.completions.create(**kwargs)
         return resp.choices[0].message.content.strip()
+
+
+def chat_groq(
+    messages: List[dict],
+    model: str = None,
+    temperature: float = 0.1,
+    json_mode: bool = False,
+    max_tokens: int = 2000,
+) -> str:
+    """
+    Route to Groq API (Llama 3.3 70B by default). Falls back to standard chat()
+    if GROQ_API_KEY is not set.
+
+    Costs roughly 100× less than GPT-4.1 for comparable quality on
+    semantic analysis and structured generation tasks.
+    """
+    if _groq_client is None:
+        return chat(messages, model or CFG.model_splitter, temperature, json_mode, max_tokens)
+
+    effective_model = model if model and not model.startswith("gpt") else _GROQ_MODEL
+    kwargs = dict(
+        model=effective_model,
+        temperature=temperature,
+        max_tokens=max_tokens,
+        messages=messages,
+    )
+    if json_mode:
+        kwargs["response_format"] = {"type": "json_object"}
+    resp = _groq_client.chat.completions.create(**kwargs)
+    return resp.choices[0].message.content.strip()
