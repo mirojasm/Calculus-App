@@ -68,6 +68,7 @@ echo "[INFO] Python: $(which python3) ($(python3 --version))"
 
 # ── 2. Change to scratch working directory ────────────────────────────────────
 cd "${SCRATCH_JOB}"
+export PYTHONPATH="${SCRATCH_JOB}:${PYTHONPATH:-}"
 echo "[INFO] Working directory: $(pwd)"
 
 # ── 3. Verify training data exists ───────────────────────────────────────────

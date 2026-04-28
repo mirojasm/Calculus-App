@@ -79,6 +79,7 @@ export COLLABMATH_PROBLEMS_PER_CELL=20   # 600 problems
 
 # ── 4. Change to scratch working dir ─────────────────────────────────────────
 cd "${SCRATCH_JOB}"
+export PYTHONPATH="${SCRATCH_JOB}:${PYTHONPATH:-}"
 echo "[INFO] Working directory: $(pwd)"
 python3 -c "import research; print('[INFO] research package OK')"
 
