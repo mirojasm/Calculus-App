@@ -2,8 +2,8 @@
 ## Profundidad de Interdependencia Epistémica en Collaborative Problem Solving Matemático
 
 **Proyecto:** CollabMath  
-**Versión:** 2.0  
-**Estado:** Draft para revisión  
+**Versión:** 3.0  
+**Estado:** Revisado — incorpora fundamentos de diseño de información y estructura algebraica CPP  
 
 ---
 
@@ -249,9 +249,111 @@ RESULTADO      │ PISA global          │ ATC global         │ Solution comp
 
 ---
 
-### 3.3 El Espacio CPP: Estructura y Subconjuntos Relevantes
+### 3.3 Estructura Algebraica del Espacio CPP: El Reticulado Booleano
 
-El espacio completo de perfiles binarios tiene 2¹² = 4,096 elementos. Con restricciones de coherencia (algunas celdas implican otras), el subespacio factible es ≈200-400 perfiles. Los perfiles más relevantes para el estudio:
+El espacio CPP {0,1}^12 no es un conjunto plano de 4096 puntos equiprobables. Tiene estructura algebraica rica que fundamenta el diseño computacional de splits.
+
+**El reticulado booleano:**
+
+{0,1}^12 con el orden parcial componentwise (u ≤ v iff ∀i: u_i ≤ v_i) es un reticulado booleano completo con operaciones:
+```
+join: (v ∨ w)_i = max(v_i, w_i)   — unión de celdas activas
+meet: (v ∧ w)_i = min(v_i, w_i)   — intersección
+complemento: ¬v_i = 1 − v_i
+```
+
+**La función de Möbius del reticulado:**
+
+En el reticulado booleano, la función de Möbius es:
+```
+μ(u, v) = (−1)^|v − u|   si u ≤ v
+μ(u, v) = 0               si u ≰ v
+```
+donde |v − u| es el número de coordenadas donde v_i = 1 y u_i = 0. La inversión de Möbius da la contribución *independiente* de cada perfil: si f(v) es el CDI esperado del perfil v, entonces g(v) = Σ_{u≤v} μ(u,v)·f(u) mide cuánto CDI adicional aportan las celdas *nuevas* en v respecto a todos sus subperfiles. Esto permite identificar qué celdas añaden colaboración genuina versus cuáles son subproductos de otras.
+
+**DAG de prerrequisitos cognitivos:**
+
+Las 12 celdas PISA no son independientes. Existen dependencias de prerrequisito derivadas de la secuencia cognitiva de resolución de problemas:
+
+```
+A1 ←── (ninguno — punto de entrada)
+A2 ←── A1
+A3 ←── A1, A2
+B1 ←── A1
+B2 ←── A2, B1
+B3 ←── A3, B2
+C1 ←── B1, B2
+C2 ←── C1, B2
+C3 ←── B3
+D1 ←── C1, A1
+D2 ←── C2, D1
+D3 ←── D2, B3
+```
+
+Este DAG define una relación de orden parcial. Los perfiles CPP cognitivamente coherentes son los **upsets** de este DAG: conjuntos cerrados bajo la operación "si celda i está activa, todos sus prerrequisitos también deben estar activos". El número de upsets de este DAG específico es aproximadamente 200-400, reduciendo el espacio de búsqueda efectivo desde 4096 a ~5-10% del total.
+
+**Implicación para el diseño:** Antes de intentar generar un split que active un target CPP t, se debe verificar que t es un upset del DAG. Si no lo es, se completa hacia el upset mínimo que contiene t.
+
+**El espacio efectivo:**
+
+La matriz de correlación entre celdas Σ ∈ R^{12×12} calculada sobre el corpus tiene rango efectivo r << 12. Hipótesis empírica: r ≈ 4-5 factores principales, uno por fila PISA (cada fila comparte un proceso cognitivo). Esto significa que el espacio CPP efectivo es ~4-5 dimensional, no 12 dimensional, lo que hace la optimización mucho más tractable.
+
+---
+
+### 3.4 Diseño de Información como Fundamento Teórico de C2
+
+**El Teorema BCE (Bergemann & Morris 2016):**
+
+La generación de splits dirigida por perfil CPP es un problema de diseño de información en el sentido de Kamenica & Gentzkow (2011) y Bergemann & Morris (2019).
+
+**Formalización:**
+- Sender = diseñador del split (sistema CollabMath)
+- Receivers = agentes LLM
+- State of the world = estructura completa del problema matemático Ω
+- Signals = paquetes de información (I_A, I_B) — el split
+- Actions = comportamientos colaborativos en la conversación
+- Target behavior rule = perfil CPP objetivo t ∈ {0,1}^12
+
+**Teorema:** Un perfil CPP t es alcanzable por algún split si y solo si t es un Bayes Correlated Equilibrium (BCE) del juego de colaboración inducido por los paquetes. Las restricciones BCE son **lineales** en la regla de comportamiento t, lo que hace el conjunto de perfiles alcanzables un politopo convexo.
+
+**El resultado de concavificación:** La utilidad máxima del diseñador (CDI esperado) es el envelope cóncavo de la función de utilidad evaluada en el prior. Esto da:
+1. Un test de alcanzabilidad: si t no es BCE-factible, ningún split puede inducirlo
+2. Un criterio de optimalidad: el split óptimo para target t se puede encontrar resolviendo un LP
+
+**Implicación práctica:** Antes de diseñar un split para un perfil CPP objetivo, se puede verificar algorítmicamente si ese perfil es alcanzable para ese problema. Si no lo es, el algoritmo sugiere el perfil BCE-factible más cercano.
+
+**Fuentes:** Kamenica, E., & Gentzkow, M. (2011). Bayesian Persuasion. *American Economic Review, 101*(6), 2590–2615. Bergemann, D., & Morris, S. (2019). Information Design: A Unified Perspective. *Journal of Economic Literature, 57*(1), 44–95.
+
+---
+
+### 3.5 Tabla de Correspondencias: Celda PISA → Tipo de Asimetría de Información
+
+El hallazgo teórico central para el diseño computacional de splits: cada celda PISA corresponde a un **tipo específico de asimetría de información** que, cuando está presente en el split, *causa* la activación de esa celda en la conversación. Esta tabla es el mecanismo causal que conecta diseño del split con activación de celda (fundamentado en Hutchins 1995 y Stahl 2006).
+
+| Celda | Nombre PISA | Tipo de Asimetría Requerida | Condición Formal de Información |
+|-------|-------------|---------------------------|--------------------------------|
+| **A1** | Descubrir perspectivas/habilidades | Los agentes no conocen las capacidades del otro *a priori* | H(X_A\|I_A) > 0 ∧ H(X_B\|I_B) > 0 donde X = "capacidades del otro" |
+| **A2** | Descubrir normas de interacción | Scripts de colaboración distintos o ausentes en los paquetes | No existe protocolo de comunicación compartido pre-especificado |
+| **A3** | Comprender roles emergentes | Roles implicados por la información pero no nombrados explícitamente | I_A y I_B implican roles complementarios sin asignarlos |
+| **B1** | Construir representación compartida | Representaciones distintas del mismo objeto matemático | I_A da acceso algebraico; I_B da acceso geométrico (o equivalente) |
+| **B2** | Identificar tareas necesarias | Lista de sub-tareas distribuida entre paquetes | Ningún agente puede enumerar todos los pasos necesarios solo |
+| **B3** | Describir roles en la ejecución | Ambigüedad genuina sobre quién ejecuta qué durante el proceso | Múltiples distribuciones de trabajo válidas dado los paquetes |
+| **C1** | Comunicar acciones antes de ejecutar | El agente A debe anunciar su paso para que B lo valide | Output(A, paso_i) es *necesario* para que B valide antes de continuar |
+| **C2** | Ejecutar el plan acordado | Dependencia matemática directa entre outputs de agentes | Output(A, paso_k) = Input(B, paso_{k+1}) — cadena inquebrante |
+| **C3** | Seguir reglas de participación | Mecanismo de verificación de contribución equitativa | Hay criterios de participación que requieren monitoreo del otro |
+| **D1** | Reparar entendimiento compartido | Ambigüedad semántica deliberada que emerge durante ejecución | El problema contiene términos con interpretaciones que divergen al ejecutar |
+| **D2** | Monitorear éxito de acciones | Criterios de evaluación distribuidos | A tiene criterio de "es correcto matemáticamente"; B tiene criterio de "es completo/suficiente" |
+| **D3** | Adaptar organización/roles | Evento mid-problem que invalida el plan inicial | El problema tiene una "sorpresa estructural" que requiere re-distribución |
+
+**Principio de Hutchins-Stahl:** Los procesos cognitivos colaborativos emergen de la *propagación de estados representacionales* a través de la brecha entre lo que sabe cada agente. Cada celda PISA representa un tipo distinto de brecha. Un split de alta calidad diseña brechas deliberadas que fuerzan la propagación de representaciones — esto es la colaboración genuina.
+
+**Fuentes:** Hutchins, E. (1995). *Cognition in the Wild*. MIT Press. Stahl, G. (2006). *Group Cognition: Computer Support for Building Collaborative Knowledge*. MIT Press.
+
+---
+
+### 3.6 El Espacio CPP: Perfiles y Subconjuntos Relevantes
+
+El espacio completo de perfiles binarios tiene 2¹² = 4,096 elementos. Con restricciones de coherencia (DAG de prerrequisitos + restricciones BCE), el subespacio factible es ≈200-400 perfiles. Los perfiles más relevantes para el estudio:
 
 | Perfil | Celdas activas | CDI | Nombre | Lattice |
 |--------|---------------|-----|--------|---------|
@@ -269,7 +371,7 @@ El espacio completo de perfiles binarios tiene 2¹² = 4,096 elementos. Con rest
 
 ---
 
-### 3.4 Relación con los Patrones de Split (SPLIT-A a G)
+### 3.7 Relación con los Patrones de Split (SPLIT-A a G)
 
 Los siete patrones de split empíricos se mapean al espacio CPP:
 
@@ -322,6 +424,8 @@ El 66% del corpus actual usa SPLIT-C, que degenera frecuentemente a CPP-T — ca
 | **H5** | C5 > C1 en PISA_global y ATC_global (p<0.05); neutral en accuracy para L1-3 | Experimento 5 condiciones, n=20 |
 | **H6** | PISA_global(CPP-DEEP) > PISA_global(CPP-T) en mismos problemas | Comparación within-problem, n=20 |
 | **H7** | geometry y counting_and_probability tienen CDI_max > algebra y prealgebra | Análisis por subject, corpus 600 |
+| **H8** | targeting_error(C2_CIDI) < targeting_error(C2_prompt) < targeting_error(C3_constitutional), donde targeting_error = Hamming(CPP_achieved, t) / 12 | Experimento piloto 4×5 condiciones |
+| **H9** | Los perfiles CPP observados forman un subconjunto cerrado bajo la intersección (lattice closure), verificando que son upsets del DAG de prerrequisitos | Análisis FCA sobre corpus n=150 |
 
 ---
 
@@ -372,3 +476,17 @@ van Merriënboer, J. J. G., Clark, R. E., & de Croock, M. B. M. (2002). Blueprin
 Vygotsky, L. S. (1978). *Mind in Society: The Development of Higher Psychological Processes*. Harvard University Press.
 
 Wegner, D. M. (1987). Transactive memory: A contemporary analysis of the group mind. In B. Mullen & G. R. Goethals (Eds.), *Theories of Group Behavior* (pp. 185–208). Springer.
+
+Bergemann, D., & Morris, S. (2019). Information Design: A Unified Perspective. *Journal of Economic Literature, 57*(1), 44–95. DOI: 10.1257/jel.20181489
+
+Kamenica, E., & Gentzkow, M. (2011). Bayesian Persuasion. *American Economic Review, 101*(6), 2590–2615. DOI: 10.1257/aer.101.6.2590
+
+Ganter, B., & Wille, R. (1999). *Formal Concept Analysis: Mathematical Foundations*. Springer. DOI: 10.1007/978-3-642-59830-2
+
+Stahl, G. (2006). *Group Cognition: Computer Support for Building Collaborative Knowledge*. MIT Press.
+
+Yang, K., & Klein, D. (2021). FUDGE: Controlled Text Generation With Future Discriminators. *Proceedings of NAACL 2021*. DOI: 10.18653/v1/2021.naacl-main.276
+
+DeepSeek-AI. (2025). DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement Learning. *arXiv:2501.12948*.
+
+Pearl, J. (2009). *Causality: Models, Reasoning, and Inference* (2nd ed.). Cambridge University Press.

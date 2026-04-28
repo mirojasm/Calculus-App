@@ -23,3 +23,4 @@ build/
 outputs/
 __pycache__/
 *.pyc
+outputs/backups/
