@@ -61,7 +61,7 @@ mkdir -p "${SCRATCH_JOB}/logs"
 
 # ── 1. Load modules ───────────────────────────────────────────────────────────
 module load Miniforge3/24.11.3-0
-module load CUDA/12.1.0
+module load CUDA/12.1.1
 
 source activate "${CONDA_ENV_PATH}"
 echo "[INFO] Python: $(which python3) ($(python3 --version))"
