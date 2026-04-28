@@ -13,6 +13,9 @@ Taxonomy of 7 split patterns:
 split(problem_id, problem, n) -> SplitResult
   - n=1  → solo condition (no split)
   - n≥2  → jigsaw with explicit roles, group awareness, Szewkis conditions
+
+split_cpp_targeted(problem_id, problem, n) -> SplitResult
+  - Condition C2: CPP-DEEP objective + Szewkis as hard constraints
 """
 import json, textwrap
 from dataclasses import dataclass, field
@@ -301,6 +304,152 @@ def _is_valid_split(validation_log: dict, n: int) -> bool:
 
 
 # ── public API ────────────────────────────────────────────────────────────────
+
+_CPP_TARGETED_SYSTEM = textwrap.dedent("""
+Eres un experto en diseño de actividades de aprendizaje colaborativo matemático.
+Tu tarea es dividir un problema matemático en {n} paquetes de información para
+que {n} agentes LLM puedan resolverlo conjuntamente mediante Collaborative Problem
+Solving (CPS) genuino.
+
+## PERFIL CPP OBJETIVO (CPP-DEEP)
+El split debe activar las siguientes celdas de la matriz PISA CPS.
+"Activa" significa que esa celda requerirá colaboración real — ningún agente puede
+completarla sin input activo del otro.
+
+Celdas a activar:
+- A1 (Explorar·Conocimiento compartido): Los agentes deben descubrir qué sabe el
+  otro y qué pueden hacer. Ninguno puede evaluar su propia información sin conocer
+  la del otro.
+- A2 (Explorar·Acción): Los agentes deben establecer juntos las normas de
+  interacción (¿quién lidera cada paso? ¿cómo verifican acuerdo?).
+- A3 (Explorar·Organización): Los roles deben emerger de la exploración conjunta,
+  no ser asignados a priori.
+- B1 (Formular·Conocimiento compartido): Los agentes deben negociar explícitamente
+  la representación del problema — no pueden asumir que comparten la misma
+  interpretación.
+- B2 (Formular·Acción): Identificar las sub-tareas requiere información de ambos
+  agentes — ninguno puede hacer la lista completo solo.
+- B3 (Formular·Organización): La distribución del trabajo en la ejecución debe
+  negociarse, no derivarse automáticamente del split inicial.
+- C1 (Ejecutar·Conocimiento compartido): Antes de cada paso de ejecución, los
+  agentes deben comunicar qué van a hacer y por qué — el otro debe confirmar.
+- C2 (Ejecutar·Acción): Hay pasos de ejecución que literalmente requieren el
+  resultado del otro como input. No es opcional consultar.
+
+## CONDICIONES SZEWKIS (RESTRICCIONES MÍNIMAS)
+El split debe garantizar estructuralmente:
+1. OBJETIVO COMÚN: La meta debe ser compartida y explícita. Ambos agentes trabajan
+   para resolver el mismo problema completo, no "su parte".
+2. INTERDEPENDENCIA POSITIVA: Ningún agente puede resolver el problema completo
+   incluso si recibe toda la información del otro en el turno 1. La integración
+   misma requiere razonamiento nuevo.
+3. RESPONSABILIDAD INDIVIDUAL: Cada agente tiene una contribución única y
+   necesaria en al menos 3 momentos distintos de la resolución.
+4. RECOMPENSA GRUPAL: El éxito se define como "el grupo llegó a la respuesta
+   correcta juntos" — no "cada uno resolvió su parte".
+5. CONCIENCIA GRUPAL: El split debe hacer necesario que cada agente mantenga un
+   modelo mental del otro (qué sabe, qué puede hacer, qué ya hizo).
+6. COORDINACIÓN Y COMUNICACIÓN: Los agentes deben coordinar activamente el proceso
+   — no pueden trabajar en paralelo y juntar al final.
+
+## TEST DE PROFUNDIDAD
+Antes de finalizar el split, verifica internamente:
+- Si Agente 1 le dice todo su paquete al Agente 2 en el turno 1, ¿puede Agente 2
+  resolver solo? Si SÍ, el split es superficial — rediseña.
+- ¿Requieren al menos 4 intercambios de información para llegar a la solución?
+- ¿Cada agente hace razonamiento matemático propio en al menos 2 momentos?
+
+## OUTPUT
+Responde SOLO con JSON válido:
+{{
+  "pattern": "SPLIT-X",
+  "shared_context": "...",
+  "agent_roles": [
+    {{"agent_id": 1, "role_name": "...", "role_description": "..."}},
+    ...
+  ],
+  "packets": [
+    {{"agent_id": 1, "information": "..."}},
+    ...
+  ],
+  "split_rationale": "...",
+  "depth_verification": {{
+    "agent2_can_solve_alone_after_turn1": false,
+    "minimum_exchanges_needed": 4,
+    "mathematical_actions_per_agent": 2,
+    "szewkis_satisfied": [true, true, true, true, true, true]
+  }}
+}}
+""")
+
+
+def split_cpp_targeted(
+    problem_id: str,
+    problem:    str,
+    n:          int = 2,
+    validate:   bool = True,
+    max_retries: int = 2,
+) -> SplitResult:
+    """
+    Condition C2: generate a split explicitly targeting CPP-DEEP with
+    Szewkis conditions as hard constraints in the prompt.
+    """
+    system = _CPP_TARGETED_SYSTEM.format(n=n)
+    raw_split: dict = {}
+    packets:   List[Packet] = []
+    shared:    str = ""
+    pattern:   str = ""
+    log:       dict = {}
+
+    for attempt in range(max_retries + 1):
+        try:
+            raw    = _call(system, f"PROBLEM:\n{problem}", model=CFG.model_splitter,
+                           temperature=0.3, max_tokens=4000)
+            raw_split = json.loads(raw)
+            shared    = raw_split.get("shared_context", "")
+            pattern   = raw_split.get("pattern", "SPLIT-C")
+
+            roles = {r["agent_id"]: r for r in raw_split.get("agent_roles", [])}
+            packets = [
+                Packet(
+                    agent_id=p["agent_id"],
+                    information=p["information"],
+                    role_name=roles.get(p["agent_id"], {}).get("role_name",
+                              f"Agent {p['agent_id']}"),
+                    role_description=roles.get(p["agent_id"], {}).get("role_description", ""),
+                )
+                for p in raw_split.get("packets", [])
+            ]
+            if len(packets) != n:
+                continue
+        except (json.JSONDecodeError, KeyError):
+            continue
+
+        if not validate:
+            return SplitResult(
+                problem_id=problem_id, problem=problem, n=n,
+                pattern=pattern, shared_context=shared, packets=packets,
+                valid=True, raw_split=raw_split,
+            )
+
+        log = {}
+        for pkt in packets:
+            log[f"solo_{pkt.agent_id}"] = _validate_solo(shared, pkt, problem)
+        log["combined"] = _validate_combined(shared, packets, problem)
+
+        if _is_valid_split(log, n):
+            return SplitResult(
+                problem_id=problem_id, problem=problem, n=n,
+                pattern=pattern, shared_context=shared, packets=packets,
+                valid=True, validation_log=log, raw_split=raw_split,
+            )
+
+    return SplitResult(
+        problem_id=problem_id, problem=problem, n=n,
+        pattern=pattern, shared_context=shared, packets=packets,
+        valid=False, validation_log=log, raw_split=raw_split,
+    )
+
 
 def split(problem_id: str, problem: str, n: int,
           validate: bool = True, max_retries: int = 2) -> SplitResult:

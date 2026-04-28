@@ -356,10 +356,108 @@ def simulate_social_pair(split_result: SplitResult, condition: str) -> Conversat
 
 # ── public API ────────────────────────────────────────────────────────────────
 
+def simulate_with_monitor(
+    split_result: SplitResult,
+    condition: str,
+    max_interventions: int = 2,
+) -> Conversation:
+    """
+    Condition C4/C5: jigsaw simulation with a Szewkis monitor injecting
+    corrective interventions after PISA phase transitions (A and B only).
+
+    Injects at most max_interventions monitor turns into the conversation.
+    Monitor turns appear as Agent 0 with role 'facilitator'.
+    """
+    from research.simulation.monitor import detect_phase, evaluate_phase, MONITOR_PHASES
+
+    n       = split_result.n
+    packets = split_result.packets
+
+    systems = {
+        pkt.agent_id: _build_jigsaw_system(
+            split_result.shared_context, pkt, packets, n, pkt.agent_id
+        )
+        for pkt in packets
+    }
+
+    shared_transcript: List[dict] = []
+    turns:             List[Turn] = []
+    interventions:     int = 0
+    current_phase:     str = "A"
+    phase_start_idx:   int = 0
+
+    agent_order = [((i % n) + 1) for i in range(CFG.max_turns)]
+
+    for turn_idx, agent_id in enumerate(agent_order):
+        history = shared_transcript.copy()
+        if not history:
+            history.append({"role": "user", "content": "Let's start. Share what you know."})
+
+        response = _chat(systems[agent_id], history)
+        turn = Turn(agent_id=agent_id, role="assistant", content=response)
+        turns.append(turn)
+
+        shared_transcript.append({
+            "role": "user" if turn_idx % 2 == 0 else "assistant",
+            "content": f"[Agent {agent_id}]: {response}",
+        })
+
+        # Detect phase transition
+        history_dicts = [{"content": t.content} for t in turns]
+        new_phase = detect_phase(history_dicts)
+
+        if new_phase != current_phase and interventions < max_interventions:
+            if current_phase in MONITOR_PHASES:
+                phase_turns = [
+                    {"agent_id": t.agent_id, "content": t.content}
+                    for t in turns[phase_start_idx:]
+                ]
+                monitor_result = evaluate_phase(
+                    current_phase, phase_turns, n, split_result.problem
+                )
+                if monitor_result.intervene and monitor_result.intervention:
+                    intervention_text = monitor_result.intervention
+                    monitor_turn = Turn(
+                        agent_id=0,
+                        role="user",
+                        content=f"[FACILITATOR]: {intervention_text}",
+                    )
+                    turns.append(monitor_turn)
+                    shared_transcript.append({
+                        "role": "user",
+                        "content": f"[FACILITATOR]: {intervention_text}",
+                    })
+                    interventions += 1
+
+            current_phase   = new_phase
+            phase_start_idx = len(turns)
+
+        if _consensus_reached(turns, n):
+            break
+
+    final = None
+    for t in reversed(turns):
+        a = _extract_answer(t.content)
+        if a:
+            final = a
+            break
+
+    return Conversation(
+        problem_id=split_result.problem_id,
+        condition=condition,
+        n=n,
+        turns=turns,
+        final_answer=final,
+        consensus=_consensus_reached(turns, n),
+        total_turns=len(turns),
+    )
+
+
 def simulate(split_result: SplitResult, condition: str) -> Conversation:
     """
     condition ∈ {"solo", "unrestricted_pair", "jigsaw_2", "jigsaw_3", "jigsaw_4",
-                 "social_jigsaw_2", "social_jigsaw_3", "social_jigsaw_4"}
+                 "social_jigsaw_2", "social_jigsaw_3", "social_jigsaw_4",
+                 "cpp_directed_2", "monitored_jigsaw_2", "integrated_2"}
     """
     if not split_result.valid and condition != "solo":
         raise ValueError(
@@ -371,5 +469,8 @@ def simulate(split_result: SplitResult, condition: str) -> Conversation:
 
     if condition.startswith("social_jigsaw"):
         return simulate_social_pair(split_result, condition)
+
+    if condition in ("monitored_jigsaw_2", "integrated_2"):
+        return simulate_with_monitor(split_result, condition)
 
     return simulate_pair(split_result, condition)
