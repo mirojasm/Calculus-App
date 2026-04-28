@@ -62,7 +62,7 @@ pip install --quiet torch torchvision torchaudio --index-url https://download.py
 # ── 4. Install vLLM ──────────────────────────────────────────────────────────
 # Pin to a stable release; bump as needed.
 echo "[INFO] Installing vLLM ..."
-pip install --quiet "vllm==0.6.6.post1"
+pip install --quiet --upgrade vllm
 
 # ── 5. Install HuggingFace stack for fine-tuning ─────────────────────────────
 echo "[INFO] Installing HuggingFace training stack ..."
