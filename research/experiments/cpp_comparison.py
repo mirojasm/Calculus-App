@@ -41,6 +41,30 @@ MODELS_DIR.mkdir(parents=True, exist_ok=True)
 
 ALL_CONDITIONS = ["C1", "C2", "C3", "C4", "C5"]
 
+# Known correct answers for pilot problems (AMC/AIME style — numeric)
+KNOWN_ANSWERS: dict[str, str] = {
+    "math_00014": "26",   # x(3x-7)=-3 → x=(7±√13)/6, m+n+p=7+13+6=26
+    "math_00050": "8",    # 712n div by 18 → n=8
+    "math_00121": "44",   # sec+tan=22/7 → csc+cot=29/15, m+n=44
+    "math_00128": "48",   # (6!+7!)/5! = 5760/120 = 48
+}
+
+
+def _check_correctness(final_answer: str | None, problem_id: str) -> str:
+    """Returns 'correct', 'incorrect', 'incomplete', or 'unknown'."""
+    known = KNOWN_ANSWERS.get(problem_id)
+    if not known:
+        return "unknown"
+    if not final_answer or not final_answer.strip():
+        return "incomplete"
+    # Normalize: extract numeric part if present
+    import re
+    nums = re.findall(r"-?\d+(?:\.\d+)?", final_answer)
+    if not nums:
+        return "incomplete"
+    # Check if any extracted number matches (handles "m+n = 44" → "44")
+    return "correct" if known in nums else "incorrect"
+
 
 # ── corpus loading ─────────────────────────────────────────────────────────────
 
@@ -175,6 +199,8 @@ def _run_with_annotator(
     cpp = annotate(conv)
     ann_sec = round(time.time() - t_ann, 1)
 
+    correctness = _check_correctness(conv.final_answer, problem_id)
+
     result = {
         "condition":     condition_name,
         "problem_id":    problem_id,
@@ -183,6 +209,9 @@ def _run_with_annotator(
         "cdi":           cpp.cdi,
         "cdi_label":     cpp.cdi_label,
         "cpp_rationale": cpp.rationale,
+        "correctness":   correctness,
+        "final_answer":  conv.final_answer,
+        "known_answer":  KNOWN_ANSWERS.get(problem_id),
         "timing": {"sim_sec": sim_sec, "annot_sec": ann_sec},
     }
     if extra:
@@ -327,11 +356,12 @@ def _cdi_label(cdi: float) -> str:
 
 
 def _print_summary(results: list[dict]) -> None:
-    print("\n" + "="*80)
+    print("\n" + "="*88)
     print("PILOT RESULTS SUMMARY")
-    print("="*80)
-    print(f"{'Problem':<22} {'Cond':<4} {'CDI':>6} {'Profile':<12} {'Turns':>6} {'H.err':>6}")
-    print("-"*80)
+    print("="*88)
+    print(f"{'Problem':<22} {'Cond':<4} {'CDI':>6} {'Profile':<12} {'Turns':>6} "
+          f"{'H.err':>6}  {'Correct?':<10}")
+    print("-"*88)
     for r in results:
         if "error" in r:
             print(f"{r.get('problem_id','?'):<22} {r.get('condition','?'):<4}  ERROR: {r['error']}")
@@ -339,13 +369,16 @@ def _print_summary(results: list[dict]) -> None:
         conv   = r.get("conversation", {})
         turns  = conv.get("total_turns", "?")
         herr   = r.get("cidi", {}).get("targeting_error", "—")
-        herr_s = f"{herr:.2f}" if isinstance(herr, float) else "—"
+        herr_s = f"{herr:.2f}" if isinstance(herr, float) else "  —"
+        corr   = r.get("correctness", "?")
+        ans    = r.get("final_answer", "") or ""
+        ans_s  = ans[:12] if len(ans) <= 12 else ans[:10]+"…"
         print(
             f"{r['problem_id']:<22} {r['condition']:<4} "
             f"{r.get('cdi', 0):>6.3f} {r.get('cdi_label','?'):<12} "
-            f"{turns:>6} {herr_s:>6}"
+            f"{turns:>6} {herr_s:>6}  {corr:<10} [{ans_s}]"
         )
-    print("="*80)
+    print("="*88)
 
 
 # ── main runner ────────────────────────────────────────────────────────────────

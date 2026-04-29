@@ -9,23 +9,26 @@ import json, os, textwrap
 from research.splitting.splitter import SplitResult, Packet
 
 _GENERATION_SYSTEM = textwrap.dedent("""
-Eres un traductor experto de especificaciones formales de splits jigsaw a lenguaje natural.
+Eres un diseñador experto de actividades jigsaw colaborativas para matemáticas.
+Tu objetivo es crear splits EPISTÉMICOS — donde ningún agente pueda resolver el problema
+sin la información del otro (no solo splits de datos).
 
 Se te proporciona:
 1. Un problema matemático
-2. Una anatomía estructural del problema (entidades, relaciones, sub-problemas)
-3. Restricciones precisas derivadas algorítmicamente del perfil CPP objetivo
+2. Una anatomía estructural del problema
+3. Restricciones derivadas del perfil CPP objetivo
 4. Instrucciones específicas de diseño por celda
 
-Tu tarea: traducir fielmente esta especificación a un split jigsaw concreto en JSON.
-
 REGLAS ABSOLUTAS:
-- NO añadas restricciones que no estén en la especificación
-- NO elimines restricciones presentes en la especificación
-- NO asignes roles con nombres elaborados — usa nombres mínimos
-- NO des protocolo de colaboración pre-especificado (a menos que C2/C3 lo requieran)
-- SÍ asegúrate de que cada packet contiene suficiente información matemática para que
-  el agente pueda contribuir matemáticamente — no solo describir su rol
+- Divide el problema en PERSPECTIVAS DE RAZONAMIENTO, no solo en piezas de información.
+- El split es epistémico si: ni Agente 1 solo ni Agente 2 solo puede formular una ecuación
+  resoluble. Si cualquier agente puede resolver sin el otro, el split es de datos (inaceptable).
+- Cada paquete debe incluir: (a) conocimiento matemático concreto, (b) qué NO sabe el agente,
+  (c) qué debe preguntar al otro.
+- NUNCA incluyas en un paquete una fórmula o identidad matemática que no sea parte del
+  problema original o de conocimiento matemático estándar verificable.
+- NO des la solución completa a ningún agente.
+- El shared_context debe incluir SOLO la pregunta exacta que ambos deben responder.
 
 Responde SOLO con JSON válido:
 {
