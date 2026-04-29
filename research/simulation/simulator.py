@@ -172,11 +172,15 @@ def _extract_answer(text: str) -> Optional[str]:
 
 
 def _consensus_reached(turns: List[Turn], n: int) -> bool:
-    """True when at least n distinct agents have stated a FINAL ANSWER."""
+    """True when ALL n agents have each stated a FINAL ANSWER at least once.
+    Requires full convergence (Roschelle 1992): every participant independently
+    declares the same answer, not just majority. For n=2 this means both agents
+    must respond — prevents early termination after Agent 1's solo answer.
+    """
     agents_with_answer = {
         t.agent_id for t in turns if _extract_answer(t.content)
     }
-    return len(agents_with_answer) >= max(1, n - 1)   # majority agreement
+    return len(agents_with_answer) >= n
 
 
 # ── core call ─────────────────────────────────────────────────────────────────

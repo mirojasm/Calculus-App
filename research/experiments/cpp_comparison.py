@@ -58,10 +58,26 @@ KNOWN_ANSWERS: dict[str, str] = {
 # Redesigned epistemic splits for problems where the CIDI pipeline produces data splits.
 # Applied to conditions C2-C5 (not C1 baseline) to isolate condition effects from split quality.
 SPLIT_OVERRIDES: dict[str, dict] = {
+    # math_00121: sec θ + tan θ = 22/7 → csc θ + cot θ = m/n, find m+n=44.
+    # Correct chain: A1 derives sin θ and cos θ from the given equation (intermediate
+    # values); A2 uses those to compute csc θ + cot θ = (1+cos θ)/sin θ = m/n and
+    # extracts m+n. Neither can complete the chain without the other's output.
     "math_00121": {
-        "shared_context": "A competition problem: find the value of m + n.",
-        "agent_1_info":   "sec θ + tan θ = 22/7",
-        "agent_2_info":   "csc θ + cot θ = m/n where gcd(m, n) = 1. Find m + n.",
+        "shared_context": "Find the integer m + n.",
+        "agent_1_info": (
+            "Input: sec θ + tan θ = 22/7\n"
+            "Task: Use the Pythagorean identity sec²θ − tan²θ = 1 to derive the "
+            "exact values of sin θ and cos θ.\n"
+            "Share: the exact fractions for sin θ and cos θ.\n"
+            "Needs from partner: confirmation that m + n has been computed."
+        ),
+        "agent_2_info": (
+            "Input: csc θ + cot θ = m/n where gcd(m, n) = 1.\n"
+            "Task: Once you receive sin θ and cos θ from your partner, compute "
+            "csc θ + cot θ = (1 + cos θ) / sin θ, reduce the fraction, and find m + n.\n"
+            "Share: the value of m + n.\n"
+            "Needs from partner: the exact values of sin θ and cos θ."
+        ),
     },
 }
 
