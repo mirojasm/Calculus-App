@@ -69,11 +69,21 @@ def chat(
     client, effective_model, use_responses = _route(model)
 
     if use_responses:
+        # Responses API requires the word "json" somewhere in the input messages
+        # when json_mode is enabled (unlike Chat Completions API).
+        if json_mode:
+            full_text = " ".join(
+                m.get("content", "") if isinstance(m.get("content"), str) else ""
+                for m in messages
+            )
+            if "json" not in full_text.lower():
+                messages = list(messages)
+                last = messages[-1]
+                messages[-1] = {**last, "content": last.get("content", "") + "\n\nResponde en JSON."}
         kwargs: dict = dict(
             model=effective_model,
             input=messages,
             max_output_tokens=max_tokens,
-            # no reasoning param: consumes output token budget silently on mini models
         )
         if json_mode:
             kwargs["text"] = {"format": {"type": "json_object"}}
