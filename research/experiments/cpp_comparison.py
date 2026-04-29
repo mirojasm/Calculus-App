@@ -60,8 +60,14 @@ SPLIT_OVERRIDES: dict[str, dict] = {
 }
 
 
-def _check_correctness(final_answer: str | None, problem_id: str) -> str:
-    """Returns 'correct', 'incorrect', 'incomplete', or 'unknown'."""
+def _check_correctness(final_answer: str | None, problem_id: str,
+                        answer_format: dict | None = None) -> str:
+    """
+    Returns 'correct', 'partial', 'incorrect', 'incomplete', or 'unknown'.
+    'partial': answer shows correct mathematical progress but wrong final form
+               (e.g., found the intermediate fraction but didn't compute m+n).
+    Uses partial_credit_indicators from M1 anatomy when available.
+    """
     known = KNOWN_ANSWERS.get(problem_id)
     if not known:
         return "unknown"
@@ -71,39 +77,52 @@ def _check_correctness(final_answer: str | None, problem_id: str) -> str:
     nums = re.findall(r"-?\d+(?:\.\d+)?", final_answer)
     if not nums:
         return "incomplete"
-    return "correct" if known in nums else "incorrect"
+    if known in nums:
+        return "correct"
+    # Check for partial credit: correct intermediate value present in answer
+    indicators = (answer_format or {}).get("partial_credit_indicators", [])
+    answer_lower = final_answer.lower()
+    for indicator in indicators:
+        if str(indicator).lower() in answer_lower:
+            return "partial"
+    return "incorrect"
 
 
 def _compute_cy(cdi: float, correctness: str) -> float:
     """
     Collaborative Yield: combines CDI (process) and correctness (outcome).
+    correctness levels: 'correct'=1.0, 'partial'=0.5, else 0.0
     Awards a coupling bonus when deep collaboration produced the right answer,
     and penalizes low-process correct answers (trivial/lucky).
     α=0.35 (process), β=0.45 (outcome), γ=0.20 (coupling bonus).
     """
-    corr_bin = 1.0 if correctness == "correct" else 0.0
+    corr_weight = {"correct": 1.0, "partial": 0.5}.get(correctness, 0.0)
     if cdi >= 0.5 and correctness == "correct":
         coupling = 1.0
+    elif cdi >= 0.5 and correctness == "partial":
+        coupling = 0.3   # partial credit for partial answer with deep process
     elif cdi < 0.3 and correctness == "correct":
-        coupling = -0.5   # penalize trivial correct
+        coupling = -0.5  # penalize trivial correct
     else:
         coupling = 0.0
-    return round(0.35 * cdi + 0.45 * corr_bin + 0.20 * coupling, 3)
+    return round(0.35 * cdi + 0.45 * corr_weight + 0.20 * coupling, 3)
 
 
 def _get_quadrant(cdi: float, correctness: str) -> str:
     """
-    2D process-outcome quadrant (Kapur productive-failure taxonomy):
+    2D process-outcome quadrant (Kapur productive-failure taxonomy).
+    'partial' is treated as a productive failure variant with correct reasoning.
       COUPLING      — deep collaboration → correct answer (target state)
+      PARTIAL_COUP  — deep collaboration → partial answer (correct reasoning, format error)
       PROD_FAIL     — deep collaboration → incorrect (productive failure)
       TRIVIAL       — shallow process → correct (lucky or too easy)
-      COLLAPSE      — shallow process → incorrect
+      COLLAPSE      — shallow process → incorrect/incomplete
     """
     high = cdi >= 0.5
-    corr = correctness == "correct"
-    if high and corr:      return "COUPLING"
-    if high and not corr:  return "PROD_FAIL"
-    if not high and corr:  return "TRIVIAL"
+    if high and correctness == "correct":   return "COUPLING"
+    if high and correctness == "partial":   return "PARTIAL_COUP"
+    if high:                                return "PROD_FAIL"
+    if correctness == "correct":            return "TRIVIAL"
     return "COLLAPSE"
 
 
@@ -239,6 +258,24 @@ def run_c1(problem_id: str, problem: str) -> dict:
     }
 
 
+def _ensure_answer_format(split_result, problem: str) -> None:
+    """
+    Ensure split_result.answer_format is populated.
+    For conditions that don't use the CIDI pipeline (C3, C4), call M1 lightweight extraction.
+    """
+    if getattr(split_result, "answer_format", None):
+        return
+    try:
+        from research.splitting.cidi.module1_semantic import extract_answer_format
+        split_result.answer_format = extract_answer_format(problem)
+    except Exception:
+        split_result.answer_format = {
+            "type": "other",
+            "specification": "State your final answer clearly when both partners agree.",
+            "partial_credit_indicators": [],
+        }
+
+
 def _run_with_annotator(
     condition_name: str,
     problem_id: str,
@@ -253,6 +290,9 @@ def _run_with_annotator(
     if apply_override:
         split_result, overridden = _apply_split_override(split_result, problem_id)
 
+    _ensure_answer_format(split_result, problem)
+    answer_format = getattr(split_result, "answer_format", {}) or {}
+
     t_sim = time.time()
     conv = sim_fn(split_result)
     sim_sec = round(time.time() - t_sim, 1)
@@ -261,24 +301,25 @@ def _run_with_annotator(
     cpp = annotate(conv)
     ann_sec = round(time.time() - t_ann, 1)
 
-    correctness = _check_correctness(conv.final_answer, problem_id)
+    correctness = _check_correctness(conv.final_answer, problem_id, answer_format)
     cdi = cpp.cdi
 
     result = {
-        "condition":      condition_name,
-        "problem_id":     problem_id,
-        "conversation":   conv.to_dict(),
-        "cpp_vector":     cpp.cpp_vector,
-        "cdi":            cdi,
-        "cdi_label":      cpp.cdi_label,
-        "cpp_rationale":  cpp.rationale,
-        "correctness":    correctness,
-        "cy":             _compute_cy(cdi, correctness),
-        "quadrant":       _get_quadrant(cdi, correctness),
-        "final_answer":   conv.final_answer,
-        "known_answer":   KNOWN_ANSWERS.get(problem_id),
+        "condition":        condition_name,
+        "problem_id":       problem_id,
+        "conversation":     conv.to_dict(),
+        "cpp_vector":       cpp.cpp_vector,
+        "cdi":              cdi,
+        "cdi_label":        cpp.cdi_label,
+        "cpp_rationale":    cpp.rationale,
+        "correctness":      correctness,
+        "cy":               _compute_cy(cdi, correctness),
+        "quadrant":         _get_quadrant(cdi, correctness),
+        "final_answer":     conv.final_answer,
+        "known_answer":     KNOWN_ANSWERS.get(problem_id),
+        "answer_format":    answer_format,
         "split_overridden": overridden,
-        "timing": {"sim_sec": sim_sec, "annot_sec": ann_sec},
+        "timing":           {"sim_sec": sim_sec, "annot_sec": ann_sec},
     }
     if extra:
         result.update(extra)

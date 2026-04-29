@@ -42,8 +42,36 @@ Responde SOLO con JSON válido:
     "n_variables": 0,
     "n_steps_estimated": 0,
     "has_hidden_connection": false
+  },
+  "expected_answer_format": {
+    "type": "integer|decimal|fraction|algebraic_expression|equation|set|multiple|other",
+    "specification": "Your final answer should be [descripción exacta del formato y valor esperado, inferida del enunciado]",
+    "partial_credit_indicators": [
+      "valor o forma intermedia que indica progreso correcto aunque no sea la respuesta final"
+    ]
   }
 }
+
+Para expected_answer_format.type usa:
+- integer: cuando se pide un número entero (e.g. find m+n, find the value of k)
+- decimal: cuando se espera un decimal (e.g. round to 2 decimal places)
+- fraction: cuando la respuesta es una fracción (e.g. express as p/q in lowest terms)
+- algebraic_expression: cuando la respuesta es una expresión con variables
+- equation: cuando la respuesta es una ecuación o función
+- set: cuando la respuesta es un conjunto o lista de valores
+- multiple: cuando el problema pide varias cantidades separadas
+- other: cualquier otro caso
+
+Para specification: escribe la frase concisa que irá en el goal-anchor de la actividad
+colaborativa, especificando el formato exacto. Ejemplos:
+- "Your final answer must be a single integer."
+- "Your final answer must be a reduced fraction p/q."
+- "Your final answer must be an algebraic expression in terms of x."
+- "Your final answer must be two values: the width and height."
+
+Para partial_credit_indicators: lista valores intermedios que evidencian razonamiento
+correcto aunque no sean la respuesta final (e.g. si la respuesta es m+n=44 donde
+csc+cot=29/15, entonces "29/15" es un indicador parcial válido).
 """).strip()
 
 
@@ -76,7 +104,6 @@ def analyze(problem: str) -> dict:
     try:
         anatomy = json.loads(raw)
     except json.JSONDecodeError:
-        # Fallback anatomy if parsing fails
         anatomy = {
             "entities": [],
             "relations": [],
@@ -89,6 +116,24 @@ def analyze(problem: str) -> dict:
                 "n_steps_estimated": 2,
                 "has_hidden_connection": False,
             },
+            "expected_answer_format": {
+                "type": "other",
+                "specification": "",
+                "partial_credit_indicators": [],
+            },
         }
 
     return anatomy
+
+
+def extract_answer_format(problem: str) -> dict:
+    """
+    Lightweight call to M1 that returns only the expected_answer_format field.
+    Used by conditions C3/C4 that don't run the full CIDI pipeline.
+    """
+    anatomy = analyze(problem)
+    return anatomy.get("expected_answer_format", {
+        "type": "other",
+        "specification": "",
+        "partial_credit_indicators": [],
+    })

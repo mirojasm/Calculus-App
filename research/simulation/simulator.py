@@ -228,11 +228,15 @@ def simulate_pair(split_result: SplitResult, condition: str) -> Conversation:
     shared_transcript: List[dict] = []   # what all agents see
     turns: List[Turn] = []
 
-    # Goal-anchor: minimal framing with answer format specification
+    # Goal-anchor: minimal framing with dynamic answer format specification from M1
+    fmt = getattr(split_result, "answer_format", {}) or {}
+    format_spec = fmt.get("specification", "").strip()
+    if not format_spec:
+        format_spec = "State your final answer clearly when both partners agree."
     goal_anchor = (
         f"COLLABORATIVE TASK:\n\n"
         f"{split_result.problem}\n\n"
-        f"Your final answer must be a single integer."
+        f"{format_spec}"
     )
 
     agent_order = [((i % n) + 1) for i in range(CFG.max_turns)]

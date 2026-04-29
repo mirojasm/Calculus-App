@@ -45,6 +45,7 @@ class SplitResult:
     valid:          bool
     validation_log: dict = field(default_factory=dict)
     raw_split:      dict = field(default_factory=dict)
+    answer_format:  dict = field(default_factory=dict)  # from M1: type, specification, partial_credit_indicators
 
 
 # ── system prompt ─────────────────────────────────────────────────────────────

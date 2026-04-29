@@ -206,6 +206,7 @@ def split_cidi(
 
         if h <= hamming_threshold:
             timing["total_sec"] = round(time.time() - t0, 2)
+            best_split.answer_format = anatomy.get("expected_answer_format", {})
             return CIDISplitResult(
                 split=best_split,
                 target_cells=closed_target,
@@ -226,8 +227,10 @@ def split_cidi(
 
     # Fallback: return best found
     timing["total_sec"] = round(time.time() - t0, 2)
+    final_split = best_split if best_split else split_result
+    final_split.answer_format = anatomy.get("expected_answer_format", {})
     return CIDISplitResult(
-        split=best_split if best_split else split_result,
+        split=final_split,
         target_cells=closed_target,
         feasible_cells=feasible_target,
         infeasible_cells=infeasible,
