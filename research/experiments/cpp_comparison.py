@@ -204,6 +204,37 @@ def _load_existing_scores() -> dict:
     return scores
 
 
+def _load_completed_cells() -> dict[tuple[str, str], dict]:
+    """
+    Scan PILOT_DIR for already-completed (problem_id, condition) pairs.
+    Returns dict mapping (pid, cond) → most recent result dict.
+    Used by --resume to skip cells and reload their results into the consolidated output.
+    """
+    completed: dict[tuple[str, str], tuple[str, dict]] = {}  # (pid,cond) → (ts, data)
+    for p in PILOT_DIR.glob("math_*_C*_*.json"):
+        stem = p.stem  # e.g. math_00121_C7_20260429_042801
+        parts = stem.split("_")
+        # parts: ['math', 'NNNNN', 'CX', 'YYYYMMDD', 'HHMMSS']
+        if len(parts) < 5:
+            continue
+        pid  = f"{parts[0]}_{parts[1]}"   # math_NNNNN
+        cond = parts[2]                    # CX
+        ts   = f"{parts[3]}_{parts[4]}"   # YYYYMMDD_HHMMSS
+        if not cond.startswith("C"):
+            continue
+        try:
+            data = json.loads(p.read_text())
+        except Exception:
+            continue
+        if "error" in data:
+            continue
+        # Keep the most recent timestamp for each (pid, cond)
+        prev_ts, _ = completed.get((pid, cond), ("", {}))
+        if ts > prev_ts:
+            completed[(pid, cond)] = (ts, data)
+    return {k: v[1] for k, v in completed.items()}
+
+
 # ── problem selection ──────────────────────────────────────────────────────────
 
 def select_pilot_problems(n_problems: int = 4, verbose: bool = False) -> list[dict]:
@@ -699,6 +730,7 @@ def run_pilot(
     target_cpp:      list[str] = None,
     skip_validation: bool = False,
     verbose:         bool = False,
+    resume:          bool = False,
 ) -> list[dict]:
 
     if problems is None:
@@ -719,11 +751,26 @@ def run_pilot(
     all_results = []
     timestamp   = datetime.now().strftime("%Y%m%d_%H%M%S")
 
+    completed_cells: dict[tuple[str, str], dict] = {}
+    if resume:
+        completed_cells = _load_completed_cells()
+        if completed_cells:
+            print(f"[RESUME] Found {len(completed_cells)} completed cells: "
+                  + ", ".join(f"{p}×{c}" for p, c in sorted(completed_cells)))
+
     for prob in problems:
         pid     = prob["problem_id"]
         problem = prob.get("problem", "")
 
         for cond in conditions:
+            if resume and (pid, cond) in completed_cells:
+                result = completed_cells[(pid, cond)]
+                all_results.append(result)
+                cdi   = result.get("cdi", "N/A")
+                label = result.get("cdi_label", "")
+                print(f"\n[SKIP] {pid} × {cond} (already done — CDI={cdi}, {label})")
+                continue
+
             print(f"\n[RUN] {pid} × {cond} ...", flush=True)
             t_start = time.time()
             try:
@@ -783,6 +830,8 @@ def main():
                         help="Skip M5 discriminator validation (useful before training)")
     parser.add_argument("--select-only", action="store_true",
                         help="Only print selected problems, do not run")
+    parser.add_argument("--resume",      action="store_true",
+                        help="Skip already-completed (problem, condition) pairs (checkpoint resume)")
     parser.add_argument("--verbose",     action="store_true")
     args = parser.parse_args()
 
@@ -818,6 +867,7 @@ def main():
         target_cpp=args.target_cpp,
         skip_validation=args.skip_validation,
         verbose=args.verbose,
+        resume=args.resume,
     )
 
 
