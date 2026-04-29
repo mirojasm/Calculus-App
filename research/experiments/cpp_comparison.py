@@ -698,13 +698,20 @@ def main():
 
     problems = None
     if args.problems:
-        existing = _load_existing_splits()
+        existing_splits = _load_existing_splits()
+        existing_convs  = _load_existing_conversations()
         problems = []
         for pid in args.problems:
-            if pid in existing:
-                problems.append({"problem_id": pid, **existing[pid]})
-            else:
+            if pid not in existing_splits:
                 print(f"[WARN] Problem '{pid}' not found in corpus — skipping")
+                continue
+            split_data   = existing_splits[pid]
+            conv_data    = existing_convs.get((pid, "jigsaw_2"), {})
+            problem_text = conv_data.get("problem", "") or split_data.get("problem", "")
+            if not problem_text:
+                print(f"[WARN] Problem text missing for '{pid}' — CIDI will hallucinate. "
+                      "Add 'problem' field to split JSON or use select_pilot_problems().")
+            problems.append({"problem_id": pid, "problem": problem_text, **split_data})
 
     if args.select_only:
         probs = problems or select_pilot_problems(4, verbose=True)
