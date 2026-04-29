@@ -22,10 +22,13 @@ Usage:
   python3 -m research.experiments.cpp_comparison --select-only --verbose
 """
 from __future__ import annotations
-import argparse, json, os, time
+import argparse, json, os, threading, time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
+
+_print_lock = threading.Lock()
 
 from research.config import CFG
 from research.splitting.splitter import split as standard_split
@@ -723,92 +726,126 @@ def _print_summary(results: list[dict]) -> None:
 
 # ── main runner ────────────────────────────────────────────────────────────────
 
+def _run_cell(
+    pid: str,
+    problem: str,
+    cond: str,
+    n: int,
+    target: list,
+    skip_validation: bool,
+    timestamp: str,
+    verbose: bool = False,
+) -> dict:
+    """Execute one (problem_id, condition) cell. Thread-safe: writes its own output file."""
+    t_start = time.time()
+    try:
+        result = CONDITION_RUNNERS[cond](pid, problem, n, target, skip_validation)
+    except Exception as e:
+        result = {"condition": cond, "problem_id": pid, "error": str(e)}
+        if verbose:
+            import traceback
+            with _print_lock:
+                traceback.print_exc()
+
+    result.setdefault("cdi_label", _cdi_label(result.get("cdi", 0)))
+    elapsed = round(time.time() - t_start, 1)
+
+    # Individual result file (unique filename — no write conflict between threads)
+    fname = PILOT_DIR / f"{pid}_{cond}_{timestamp}.json"
+    fname.write_text(json.dumps(result, ensure_ascii=False, indent=2, default=str))
+
+    # Clean conversation archive
+    if "conversation" in result and "error" not in result:
+        conv_fname = PILOT_CONV_DIR / f"{pid}_{cond}_{timestamp}.json"
+        conv_data  = result["conversation"].copy()
+        conv_data.update({"pilot_timestamp": timestamp,
+                          "split_overridden": result.get("split_overridden", False)})
+        conv_fname.write_text(json.dumps(conv_data, ensure_ascii=False, indent=2, default=str))
+
+    with _print_lock:
+        cdi   = result.get("cdi", "N/A")
+        cqi   = result.get("cqi", "N/A")
+        atc   = result.get("atc_cqi", "N/A")
+        label = result.get("cdi_label", "")
+        tag   = "[ERR] " if "error" in result else "[DONE]"
+        print(f"{tag} {pid} × {cond}  CDI={cdi}  CQI={cqi}  ATC={atc}  {label}  ({elapsed}s)",
+              flush=True)
+    return result
+
+
 def run_pilot(
-    problems:        Optional[list[dict]] = None,
-    conditions:      list[str] = None,
-    n:               int = 2,
-    target_cpp:      list[str] = None,
-    skip_validation: bool = False,
-    verbose:         bool = False,
-    resume:          bool = False,
+    problems:         Optional[list[dict]] = None,
+    conditions:       list[str] = None,
+    n:                int = 2,
+    target_cpp:       list[str] = None,
+    skip_validation:  bool = False,
+    verbose:          bool = False,
+    resume:           bool = False,
+    parallel_workers: int = 1,
+    n_problems:       int = 4,
 ) -> list[dict]:
 
     if problems is None:
-        print("[INFO] Selecting pilot problems from corpus...")
-        problems = select_pilot_problems(4, verbose=verbose)
+        print(f"[INFO] Selecting up to {n_problems} problems from corpus...")
+        problems = select_pilot_problems(n_problems, verbose=verbose)
         if not problems:
             raise RuntimeError(
                 "No problems found in outputs/splits/. "
                 "Run the main pipeline first to generate the corpus."
             )
-        print(f"[INFO] Selected {len(problems)} problems: "
-              f"{[p['problem_id'] for p in problems]}")
+        print(f"[INFO] Selected {len(problems)} problems")
 
     if conditions is None:
         conditions = ALL_CONDITIONS
 
     target = target_cpp or CPP_DEEP_TARGET
-    all_results = []
-    timestamp   = datetime.now().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     completed_cells: dict[tuple[str, str], dict] = {}
     if resume:
         completed_cells = _load_completed_cells()
-        if completed_cells:
-            print(f"[RESUME] Found {len(completed_cells)} completed cells: "
-                  + ", ".join(f"{p}×{c}" for p, c in sorted(completed_cells)))
+        n_skip = sum(1 for p in problems for c in conditions if (p["problem_id"], c) in completed_cells)
+        if n_skip:
+            print(f"[RESUME] {n_skip} cells already completed — will skip them")
 
+    # Build work queue
+    work: list[tuple[str, str, str]] = []  # (pid, problem_text, cond)
+    skip_results: list[dict] = []
     for prob in problems:
-        pid     = prob["problem_id"]
-        problem = prob.get("problem", "")
-
+        pid  = prob["problem_id"]
+        ptxt = prob.get("problem", "")
         for cond in conditions:
             if resume and (pid, cond) in completed_cells:
-                result = completed_cells[(pid, cond)]
-                all_results.append(result)
-                cdi   = result.get("cdi", "N/A")
-                label = result.get("cdi_label", "")
-                print(f"\n[SKIP] {pid} × {cond} (already done — CDI={cdi}, {label})")
-                continue
+                skip_results.append(completed_cells[(pid, cond)])
+                with _print_lock:
+                    r = completed_cells[(pid, cond)]
+                    print(f"[SKIP] {pid} × {cond}  CDI={r.get('cdi','?')}  {r.get('cdi_label','')}")
+            else:
+                work.append((pid, ptxt, cond))
 
-            print(f"\n[RUN] {pid} × {cond} ...", flush=True)
-            t_start = time.time()
-            try:
-                result = CONDITION_RUNNERS[cond](pid, problem, n, target, skip_validation)
-            except Exception as e:
-                import traceback
-                result = {"condition": cond, "problem_id": pid, "error": str(e)}
-                print(f"  [ERROR] {e}")
-                if verbose:
-                    traceback.print_exc()
+    print(f"[INFO] {len(work)} cells to run, {len(skip_results)} skipped (resume), "
+          f"workers={parallel_workers}")
 
-            result.setdefault("cdi_label", _cdi_label(result.get("cdi", 0)))
-            all_results.append(result)
-
-            elapsed = round(time.time() - t_start, 1)
-            cdi     = result.get("cdi", "N/A")
-            cqi     = result.get("cqi", "N/A")
-            atc_cqi = result.get("atc_cqi", "N/A")
-            label   = result.get("cdi_label", "")
-            print(f"  CDI={cdi}  CQI={cqi}  ATC_CQI={atc_cqi}  Profile={label}  ({elapsed}s)")
-
-            # Save individual result (scores + embedded conversation)
-            fname = PILOT_DIR / f"{pid}_{cond}_{timestamp}.json"
-            fname.write_text(
-                json.dumps(result, ensure_ascii=False, indent=2, default=str)
+    new_results: list[dict] = []
+    if parallel_workers > 1 and len(work) > 1:
+        with ThreadPoolExecutor(max_workers=parallel_workers) as executor:
+            futures = {
+                executor.submit(
+                    _run_cell, pid, ptxt, cond, n, target, skip_validation, timestamp, verbose
+                ): (pid, cond)
+                for pid, ptxt, cond in work
+            }
+            for future in as_completed(futures):
+                new_results.append(future.result())
+    else:
+        for pid, ptxt, cond in work:
+            new_results.append(
+                _run_cell(pid, ptxt, cond, n, target, skip_validation, timestamp, verbose)
             )
 
-            # Save clean conversation archive (for later re-scoring without re-simulation)
-            if "conversation" in result and "error" not in result:
-                conv_fname = PILOT_CONV_DIR / f"{pid}_{cond}_{timestamp}.json"
-                conv_data  = result["conversation"].copy()
-                conv_data["pilot_timestamp"] = timestamp
-                conv_data["split_overridden"] = result.get("split_overridden", False)
-                conv_fname.write_text(
-                    json.dumps(conv_data, ensure_ascii=False, indent=2, default=str)
-                )
+    all_results = skip_results + new_results
 
-    # Save consolidated
+    # Save consolidated (all cells, including skipped)
     consolidated = PILOT_DIR / f"pilot_results_{timestamp}.json"
     consolidated.write_text(
         json.dumps(all_results, ensure_ascii=False, indent=2, default=str)
@@ -832,6 +869,10 @@ def main():
                         help="Only print selected problems, do not run")
     parser.add_argument("--resume",      action="store_true",
                         help="Skip already-completed (problem, condition) pairs (checkpoint resume)")
+    parser.add_argument("--workers",     type=int, default=1,
+                        help="Parallel worker threads (default: 1; use 4-8 for corpus runs)")
+    parser.add_argument("--n-problems",  type=int, default=4,
+                        help="Max problems to auto-select (default: 4; use 9999 for full corpus)")
     parser.add_argument("--verbose",     action="store_true")
     args = parser.parse_args()
 
@@ -853,7 +894,7 @@ def main():
             problems.append({"problem_id": pid, "problem": problem_text, **split_data})
 
     if args.select_only:
-        probs = problems or select_pilot_problems(4, verbose=True)
+        probs = problems or select_pilot_problems(args.n_problems, verbose=True)
         print("\nSelected problems:")
         for p in probs:
             print(f"  {p['problem_id']:30s} subject={p.get('subject','')} "
@@ -868,6 +909,8 @@ def main():
         skip_validation=args.skip_validation,
         verbose=args.verbose,
         resume=args.resume,
+        parallel_workers=args.workers,
+        n_problems=args.n_problems,
     )
 
 
