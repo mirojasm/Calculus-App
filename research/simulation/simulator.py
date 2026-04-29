@@ -53,22 +53,30 @@ class Conversation:
 
 def _build_jigsaw_system(shared: str, packet: Packet, packets: List[Packet],
                          n: int, agent_id: int,
-                         joint_accountability: bool = False) -> str:
+                         joint_accountability: bool = False,
+                         peer_aware: bool = False) -> str:
     """
-    Minimal collaborative framing (v4).
+    Minimal collaborative framing (v4/v5).
     shared_context = goal/question only (no problem data).
-    packet.information = task-role assignment (what to compute, share, and receive).
-    joint_accountability: if True, both agents must produce the same final answer
-    (Szewkis condition 4 / Roschelle 1992 convergence criterion).
+    packet.information = the agent's assigned information (data only, no task hints).
+    joint_accountability: both agents must confirm agreement on the same final answer.
+    peer_aware: adds three lines — communication necessity, reasoning rigor, solvability.
+                Does NOT prescribe coordination strategy; the agent must discover HOW/WHEN.
     """
     context = f"{shared}\n\n{packet.information}".strip() if shared else packet.information
     joint_line = (
-        "\nBoth partners must independently state the same final answer at the end."
+        "\nBoth partners must confirm agreement on the same final answer at the end."
         if joint_accountability else ""
+    )
+    peer_lines = (
+        "\nYou need to communicate with your partner to solve this problem."
+        "\nShow all your reasoning steps — do not guess or skip steps."
+        "\nThis problem has a definite solution."
+        if peer_aware else ""
     )
     return textwrap.dedent(f"""
     You are participating in a collaborative math activity with {n - 1} partner(s).
-    You can exchange messages to work on the problem together.{joint_line}
+    You can exchange messages to work on the problem together.{peer_lines}{joint_line}
 
     {context}
     """).strip()
@@ -217,7 +225,8 @@ def simulate_solo(split_result: SplitResult) -> Conversation:
 
 
 def simulate_pair(split_result: SplitResult, condition: str,
-                  joint_accountability: bool = False) -> Conversation:
+                  joint_accountability: bool = False,
+                  peer_aware: bool = False) -> Conversation:
     """
     N≥2: jigsaw or unrestricted pair/group conversation.
     joint_accountability: both agents must each independently state the same FINAL ANSWER.
@@ -238,6 +247,7 @@ def simulate_pair(split_result: SplitResult, condition: str,
             systems[pkt.agent_id] = _build_jigsaw_system(
                 split_result.shared_context, pkt, packets, n, pkt.agent_id,
                 joint_accountability=joint_accountability,
+                peer_aware=peer_aware,
             )
 
     shared_transcript: List[dict] = []
@@ -476,12 +486,15 @@ def simulate_with_monitor(
 
 
 def simulate(split_result: SplitResult, condition: str,
-             joint_accountability: bool = False) -> Conversation:
+             joint_accountability: bool = False,
+             peer_aware: bool = False) -> Conversation:
     """
-    condition ∈ {"solo", "unrestricted_pair", "jigsaw_2", "jigsaw_3", "jigsaw_4",
-                 "social_jigsaw_2", "cpp_directed_2", "joint_jigsaw_2", ...}
-    joint_accountability: expose Roschelle convergence criterion — both agents must
-    each state the same final answer independently (Szewkis condition 4).
+    condition ∈ {"solo", "unrestricted_pair", "jigsaw_2", "peer_jigsaw_2",
+                 "joint_jigsaw_2", "social_jigsaw_2", ...}
+    joint_accountability: both agents must confirm agreement on the same final answer.
+    peer_aware: agents are told they need to communicate to solve the problem,
+                must show all reasoning steps, and that the problem has a solution.
+                Does NOT prescribe coordination strategy — Phase A must emerge.
     """
     if not split_result.valid and condition != "solo":
         raise ValueError(
@@ -498,4 +511,5 @@ def simulate(split_result: SplitResult, condition: str,
         return simulate_with_monitor(split_result, condition)
 
     return simulate_pair(split_result, condition,
-                         joint_accountability=joint_accountability)
+                         joint_accountability=joint_accountability,
+                         peer_aware=peer_aware)

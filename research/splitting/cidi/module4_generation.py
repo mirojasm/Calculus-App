@@ -10,46 +10,34 @@ from research.splitting.splitter import SplitResult, Packet
 
 _GENERATION_SYSTEM = textwrap.dedent("""
 Eres un diseñador experto de actividades jigsaw colaborativas para matemáticas (CPS).
-Tu objetivo es crear splits de TAREA EN CADENA donde la colaboración emerge de la
-estructura de la tarea, no de restricciones de conocimiento.
+Tu objetivo es crear splits de INFORMACIÓN PURA donde la colaboración emerge de la
+estructura informacional del problema, no de instrucciones sobre qué computar.
 
-PRINCIPIO CENTRAL — DISEÑO POR ROL DE TAREA:
-Asigna a cada agente una TAREA COMPUTACIONAL que produce un resultado que el otro necesita.
-- NO escribas "no sabes X" ni "tu partner tiene X" — eso pre-computa la exploración y
-  elimina Phase A del framework PISA CPS (Exploring & Understanding).
-- SÍ escribe "tu tarea es computar X a partir de Y" — eso crea cadena funcional sin
-  restringir el conocimiento del agente.
-- La exploración de POR QUÉ el otro necesita tu output, y QUÉ necesitas tú del otro,
-  debe emerger de la conversación (Phase A genuina).
+PRINCIPIO CENTRAL — FRAMING MÍNIMO:
+Cada agente recibe SOLO la información (datos, expresiones, condiciones) que le corresponde.
+NO se le dice qué computar, qué compartir, ni qué pedirle al partner.
+La colaboración debe emerger de la conversación: los agentes deben descubrir por sí mismos
+qué tiene el otro y qué necesitan intercambiar. Eso es Phase A genuina (PISA CPS).
 
-ESTRUCTURA DE TAREA EN CADENA (Split-D):
-1. Identifica la cadena de derivación natural del problema:
-   paso_1 → resultado_intermedio → paso_2 → respuesta_final
-2. Agente 1 recibe el input del paso 1 y la tarea de producir resultado_intermedio
-3. Agente 2 recibe la tarea de aplicar paso_2, que requiere resultado_intermedio de A1
-4. Ninguno puede completar la cadena sin el output del otro
+PROHIBIDO en cada paquete:
+- "Task: ...", "Share: ...", "Needs from partner: ..." — prescribir la colaboración la elimina.
+- "No sabes X", "tu partner tiene Y" — pre-computa el descubrimiento.
+- Fórmulas o identidades que el problema no menciona — es ayuda, no información.
+- La solución o cualquier paso intermedio de la solución.
 
-ESTRUCTURA OBLIGATORIA DE CADA PAQUETE:
-"Input: [información/datos disponibles para este agente]
-Task: [qué debe derivar o computar]
-Share: [qué resultado debe comunicar a su partner]
-Needs from partner: [qué resultado necesita recibir para completar la cadena]"
+OBLIGATORIO:
+- El paquete de cada agente = solo los datos, expresiones o condiciones que ese agente posee.
+- shared_context = SOLO la pregunta/objetivo final, sin ningún dato del problema.
+  Correcto: "Find the integer m + n."
+  Incorrecto: "If sec θ + tan θ = 22/7, find m + n..." (revela datos a ambos agentes)
 
-REGLAS ABSOLUTAS:
-- shared_context = SOLO la pregunta/objetivo final (sin datos del problema).
-  Ejemplo correcto: "Find the integer m + n."
-  Ejemplo incorrecto: "If sec θ + tan θ = 22/7, find m + n where csc θ + cot θ = m/n."
-  (el segundo revela los datos — ambos agentes los verían y el split sería inútil)
-- NUNCA incluyas en un paquete una fórmula o identidad que no sea parte del problema
-  original o conocimiento matemático estándar verificable.
-- La cadena debe requerir mínimo 2 intercambios secuenciales (no resuelve en 1 turno).
-- NO des la solución completa a ningún agente.
+VALIDACIÓN DE INTERDEPENDENCIA (verifica antes de responder):
+- ¿Puede el Agente 1 responder al shared_context solo con su información? Si SÍ, rediseña.
+- ¿Puede el Agente 2 responder al shared_context solo con su información? Si SÍ, rediseña.
+- ¿Combinando la información de ambos se puede responder al shared_context? Si NO, rediseña.
 
-VALIDACIÓN INTERNA (verifica antes de responder):
-- ¿Puede el Agente 1 completar toda la cadena solo? Si SÍ, rediseña.
-- ¿Puede el Agente 2 completar toda la cadena solo? Si SÍ, rediseña.
-- ¿Combinar ambos produce la respuesta final? Si NO, rediseña.
-- ¿Cada paquete describe una tarea, no una restricción de conocimiento? Si NO, rediseña.
+La prueba clave de interdependencia: cada agente, viendo solo su packet y el shared_context,
+debería concluir "necesito saber qué tiene mi partner" antes de poder avanzar.
 
 Responde SOLO con JSON válido:
 {
@@ -60,15 +48,14 @@ Responde SOLO con JSON válido:
     {"agent_id": 2, "role_name": "...", "role_description": "..."}
   ],
   "packets": [
-    {"agent_id": 1, "information": "Input: ...\nTask: ...\nShare: ...\nNeeds from partner: ..."},
-    {"agent_id": 2, "information": "Input: ...\nTask: ...\nShare: ...\nNeeds from partner: ..."}
+    {"agent_id": 1, "information": "<solo los datos/expresiones/condiciones de A1>"},
+    {"agent_id": 2, "information": "<solo los datos/expresiones/condiciones de A2>"}
   ],
-  "split_rationale": "<una oración: qué cadena de derivación se usó y por qué crea interdependencia funcional>",
-  "chain_verification": {
-    "agent1_can_complete_alone": false,
-    "agent2_can_complete_alone": false,
-    "combined_produces_answer": true,
-    "min_exchanges_required": 2
+  "split_rationale": "<una oración: qué información se separó y por qué ninguno puede responder sin el otro>",
+  "interdependence_check": {
+    "agent1_can_answer_alone": false,
+    "agent2_can_answer_alone": false,
+    "combined_can_answer": true
   },
   "cidi_metadata": {
     "target_cells": [...],
@@ -114,13 +101,14 @@ def generate(
 
     PATRÓN SUGERIDO: {pattern_hint}
 
-    INSTRUCCIONES DE DISEÑO POR CELDA CPP OBJETIVO:
-    {cell_instructions}
-
-    HINTS DE ASIGNACIÓN DE ENTIDADES:
+    EJES DE PARTICIÓN INFORMACIONAL:
     {entity_hints}
 
-    Genera el split para n={n} agentes.
+    CPP OBJETIVO (para guiar qué información activará cada celda):
+    {cell_instructions}
+
+    Genera el split de INFORMACIÓN PURA para n={n} agentes.
+    Recuerda: cada paquete = solo los datos que ese agente posee. Sin tareas, sin instrucciones.
     """).strip()
 
     # Prefer Groq for speed/cost if available, else use standard router

@@ -32,6 +32,7 @@ from research.splitting.splitter import split as standard_split
 from research.splitting.constitutional import constitutional_split
 from research.simulation.simulator import simulate, simulate_with_monitor
 from research.scoring.cpp_annotator import annotate
+from research.scoring.atc21s import annotate_conversation as annotate_atc21s
 from research.splitting.cidi.pipeline import split_cidi, CPP_DEEP_TARGET
 
 # ── paths ──────────────────────────────────────────────────────────────────────
@@ -40,12 +41,14 @@ OUT_DIR    = Path("outputs")
 SPLITS_DIR = OUT_DIR / "splits"
 CONV_DIR   = OUT_DIR / "conversations"
 PILOT_DIR  = OUT_DIR / "pilot"
+PILOT_CONV_DIR = PILOT_DIR / "conversations"   # clean conversation archives
 MODELS_DIR = OUT_DIR / "models"
 
 PILOT_DIR.mkdir(parents=True, exist_ok=True)
+PILOT_CONV_DIR.mkdir(parents=True, exist_ok=True)
 MODELS_DIR.mkdir(parents=True, exist_ok=True)
 
-ALL_CONDITIONS = ["C1", "C2", "C3", "C4", "C5"]
+ALL_CONDITIONS = ["C1", "C2", "C3", "C4", "C5", "C6"]
 
 # Known correct answers for pilot problems (AMC/AIME style — numeric)
 KNOWN_ANSWERS: dict[str, str] = {
@@ -58,26 +61,13 @@ KNOWN_ANSWERS: dict[str, str] = {
 # Redesigned epistemic splits for problems where the CIDI pipeline produces data splits.
 # Applied to conditions C2-C5 (not C1 baseline) to isolate condition effects from split quality.
 SPLIT_OVERRIDES: dict[str, dict] = {
-    # math_00121: sec θ + tan θ = 22/7 → csc θ + cot θ = m/n, find m+n=44.
-    # Correct chain: A1 derives sin θ and cos θ from the given equation (intermediate
-    # values); A2 uses those to compute csc θ + cot θ = (1+cos θ)/sin θ = m/n and
-    # extracts m+n. Neither can complete the chain without the other's output.
+    # math_00121: information-only split (v5 minimal framing principle).
+    # A1 has the given equation; A2 has the target expression and the goal.
+    # Neither knows what the other holds. Phase A must emerge from conversation.
     "math_00121": {
         "shared_context": "Find the integer m + n.",
-        "agent_1_info": (
-            "Input: sec θ + tan θ = 22/7\n"
-            "Task: Use the Pythagorean identity sec²θ − tan²θ = 1 to derive the "
-            "exact values of sin θ and cos θ.\n"
-            "Share: the exact fractions for sin θ and cos θ.\n"
-            "Needs from partner: confirmation that m + n has been computed."
-        ),
-        "agent_2_info": (
-            "Input: csc θ + cot θ = m/n where gcd(m, n) = 1.\n"
-            "Task: Once you receive sin θ and cos θ from your partner, compute "
-            "csc θ + cot θ = (1 + cos θ) / sin θ, reduce the fraction, and find m + n.\n"
-            "Share: the value of m + n.\n"
-            "Needs from partner: the exact values of sin θ and cos θ."
-        ),
+        "agent_1_info": "sec θ + tan θ = 22/7",
+        "agent_2_info": "csc θ + cot θ = m/n where gcd(m, n) = 1. Find m + n.",
     },
 }
 
@@ -321,6 +311,7 @@ def _run_with_annotator(
 
     t_ann = time.time()
     cpp = annotate(conv)
+    atc = annotate_atc21s(conv)
     ann_sec = round(time.time() - t_ann, 1)
 
     correctness = _check_correctness(conv.final_answer, problem_id, answer_format)
@@ -330,10 +321,21 @@ def _run_with_annotator(
         "condition":        condition_name,
         "problem_id":       problem_id,
         "conversation":     conv.to_dict(),
+        # CPP / PISA matrix
         "cpp_vector":       cpp.cpp_vector,
+        "quality_scores":   cpp.quality_scores,
         "cdi":              cdi,
+        "cqi":              cpp.cqi,
+        "phaq":             cpp.phaq,
         "cdi_label":        cpp.cdi_label,
         "cpp_rationale":    cpp.rationale,
+        # ATC21S
+        "atc_dim_scores":   atc.dim_scores,
+        "atc_cqi":          atc.atc_cqi,
+        "atc_social_qi":    atc.social_qi,
+        "atc_cogn_qi":      atc.cogn_qi,
+        "atc_rationale":    atc.rationale,
+        # Outcome
         "correctness":      correctness,
         "cy":               _compute_cy(cdi, correctness),
         "quadrant":         _get_quadrant(cdi, correctness),
@@ -475,12 +477,51 @@ def run_c5(
     return result
 
 
+def run_c6(
+    problem_id: str,
+    problem: str,
+    n: int = 2,
+    target_cpp: list[str] = None,
+    skip_validation: bool = False,
+) -> dict:
+    """
+    C6: CIDI epistemic split + peer-aware framing.
+    Same split as C2. Adds three lines to the system prompt:
+      - communication necessity ("you need to communicate to solve this")
+      - reasoning rigor ("show all steps, no guessing")
+      - solvability ("the problem has a definite solution")
+    Does NOT prescribe coordination strategy. Phase A must emerge from conversation.
+    Tests H3: peer awareness activates Phase A without scripting it.
+    """
+    target = target_cpp or CPP_DEEP_TARGET
+    t0 = time.time()
+    cidi_result = split_cidi(
+        problem_id, problem, target_cpp=target, n=n,
+        skip_validation=skip_validation,
+    )
+    split_sec = round(time.time() - t0, 1)
+
+    result = _run_with_annotator(
+        "C6", problem_id, problem,
+        cidi_result.split,
+        lambda sr: simulate(sr, f"peer_jigsaw_{n}", peer_aware=True),
+        extra={
+            "split": cidi_result.split.__dict__,
+            "cidi": cidi_result.to_dict(),
+            "timing": {**cidi_result.timing_sec, "split_sec": split_sec},
+            "peer_aware": True,
+        },
+    )
+    return result
+
+
 CONDITION_RUNNERS = {
     "C1": lambda pid, prob, n, t, sv: run_c1(pid, prob),
     "C2": lambda pid, prob, n, t, sv: run_c2(pid, prob, n, t, sv),
     "C3": lambda pid, prob, n, t, sv: run_c3(pid, prob, n),
     "C4": lambda pid, prob, n, t, sv: run_c4(pid, prob, n, t, sv),
     "C5": lambda pid, prob, n, t, sv: run_c5(pid, prob, n),
+    "C6": lambda pid, prob, n, t, sv: run_c6(pid, prob, n, t, sv),
 }
 
 
@@ -496,30 +537,31 @@ def _cdi_label(cdi: float) -> str:
 
 
 def _print_summary(results: list[dict]) -> None:
-    print("\n" + "="*100)
+    print("\n" + "="*110)
     print("PILOT v4 RESULTS SUMMARY")
-    print("="*100)
-    print(f"{'Problem':<22} {'Cond':<4} {'CDI':>6} {'CY':>6} {'Quadrant':<12} "
-          f"{'Profile':<12} {'Turns':>6}  {'Correct?':<10}")
-    print("-"*100)
+    print("="*110)
+    print(f"{'Problem':<22} {'Cond':<4} {'CDI':>6} {'CQI':>6} {'PhAQ':>6} {'CY':>6} "
+          f"{'Quadrant':<12} {'Profile':<12} {'Turns':>6}  {'Correct?':<10}")
+    print("-"*110)
     for r in results:
         if "error" in r:
             print(f"{r.get('problem_id','?'):<22} {r.get('condition','?'):<4}  ERROR: {r['error']}")
             continue
-        conv   = r.get("conversation", {})
-        turns  = conv.get("total_turns", "?")
-        corr   = r.get("correctness", "?")
-        ans    = r.get("final_answer", "") or ""
-        ans_s  = ans[:10] if len(ans) <= 10 else ans[:8]+"…"
+        conv    = r.get("conversation", {})
+        turns   = conv.get("total_turns", "?")
+        corr    = r.get("correctness", "?")
+        ans     = r.get("final_answer", "") or ""
+        ans_s   = ans[:10] if len(ans) <= 10 else ans[:8]+"…"
         ov_flag = "*" if r.get("split_overridden") else " "
         print(
             f"{r['problem_id']:<22} {r['condition']:<4} "
-            f"{r.get('cdi', 0):>6.3f} {r.get('cy', 0):>6.3f} "
+            f"{r.get('cdi', 0):>6.3f} {r.get('cqi', 0):>6.3f} {r.get('phaq', 0):>6.3f} "
+            f"{r.get('cy', 0):>6.3f} "
             f"{r.get('quadrant','?'):<12} "
             f"{r.get('cdi_label','?'):<12} "
             f"{turns:>6}{ov_flag} {corr:<10} [{ans_s}]"
         )
-    print("="*100)
+    print("="*110)
     print("  * = split override applied (epistemic redesign)")
 
     # Quadrant distribution summary
@@ -528,19 +570,34 @@ def _print_summary(results: list[dict]) -> None:
     print(f"\n  Quadrant distribution: " +
           " | ".join(f"{q}: {n}" for q, n in sorted(quads.items())))
 
-    # Mean CDI and CY per condition
+    # Mean CDI, CQI, PhAQ, ATC, CY per condition
     from collections import defaultdict
     by_cond: dict = defaultdict(list)
     for r in results:
         if "error" not in r:
-            by_cond[r["condition"]].append((r.get("cdi", 0), r.get("cy", 0)))
-    print("\n  Per-condition means:")
+            by_cond[r["condition"]].append({
+                "cdi":        r.get("cdi", 0),
+                "cqi":        r.get("cqi", 0),
+                "phaq":       r.get("phaq", 0),
+                "atc_cqi":    r.get("atc_cqi", 0),
+                "social_qi":  r.get("atc_social_qi", 0),
+                "cogn_qi":    r.get("atc_cogn_qi", 0),
+                "cy":         r.get("cy", 0),
+            })
+    print("\n  Per-condition means (CDI=binary presence, CQI=PISA quality, ATC=ATC21S quality):")
+    hdr = f"    {'Cond':<4}  {'CDI':>6}  {'CQI':>6}  {'PhAQ':>6}  {'ATC_CQI':>8}  {'SocialQI':>9}  {'CognQI':>7}  {'CY':>6}  n"
+    print(hdr)
+    print("    " + "-"*(len(hdr)-4))
     for cond in sorted(by_cond):
-        pairs = by_cond[cond]
-        m_cdi = sum(p[0] for p in pairs) / len(pairs)
-        m_cy  = sum(p[1] for p in pairs) / len(pairs)
-        print(f"    {cond}: CDI={m_cdi:.3f}  CY={m_cy:.3f}  (n={len(pairs)})")
-    print("="*100)
+        rows = by_cond[cond]
+        n    = len(rows)
+        def _m(k): return sum(r[k] for r in rows) / n
+        print(
+            f"    {cond:<4}  {_m('cdi'):>6.3f}  {_m('cqi'):>6.3f}  {_m('phaq'):>6.3f}  "
+            f"{_m('atc_cqi'):>8.3f}  {_m('social_qi'):>9.3f}  {_m('cogn_qi'):>7.3f}  "
+            f"{_m('cy'):>6.3f}  {n}"
+        )
+    print("="*110)
 
 
 # ── main runner ────────────────────────────────────────────────────────────────
@@ -593,14 +650,26 @@ def run_pilot(
 
             elapsed = round(time.time() - t_start, 1)
             cdi     = result.get("cdi", "N/A")
+            cqi     = result.get("cqi", "N/A")
+            atc_cqi = result.get("atc_cqi", "N/A")
             label   = result.get("cdi_label", "")
-            print(f"  CDI={cdi}  Profile={label}  ({elapsed}s)")
+            print(f"  CDI={cdi}  CQI={cqi}  ATC_CQI={atc_cqi}  Profile={label}  ({elapsed}s)")
 
-            # Save individual result
+            # Save individual result (scores + embedded conversation)
             fname = PILOT_DIR / f"{pid}_{cond}_{timestamp}.json"
             fname.write_text(
                 json.dumps(result, ensure_ascii=False, indent=2, default=str)
             )
+
+            # Save clean conversation archive (for later re-scoring without re-simulation)
+            if "conversation" in result and "error" not in result:
+                conv_fname = PILOT_CONV_DIR / f"{pid}_{cond}_{timestamp}.json"
+                conv_data  = result["conversation"].copy()
+                conv_data["pilot_timestamp"] = timestamp
+                conv_data["split_overridden"] = result.get("split_overridden", False)
+                conv_fname.write_text(
+                    json.dumps(conv_data, ensure_ascii=False, indent=2, default=str)
+                )
 
     # Save consolidated
     consolidated = PILOT_DIR / f"pilot_results_{timestamp}.json"

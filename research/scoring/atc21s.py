@@ -8,8 +8,15 @@ Dimensions scored per student message:
   CR — Co-Regulation                 (cognitive: supporting partner's process)
   SR — Shared Regulation             (cognitive: joint metacognitive regulation)
 
-Uses a 2-expert + judge MoE parallel to the PISA scorer.
-This enables cross-framework comparison on the same conversations.
+Two scoring modes:
+  1. score_conversation()      — message-level MoE (3 calls/message), used in n=30 paper
+  2. annotate_conversation()   — conversation-level (1 call), quality 0-3 per dim, CQI-analogous
+
+Quality scale (both modes):
+  0 = absent        — dimension not present
+  1 = superficial   — mechanical/scripted, motions without genuine coordination
+  2 = functional    — genuine coordination, real information need
+  3 = emergent      — new group capability neither agent had alone
 """
 import json, textwrap, math
 from dataclasses import dataclass, field
@@ -216,3 +223,98 @@ def score_conversation(conv: Conversation) -> ATC21SConversationScores:
     result.cognitive_index = agg["cognitive_index"]
     result.global_atc_index = agg["global_atc_index"]
     return result
+
+
+# ── conversation-level annotator (CQI-analogous) ──────────────────────────────
+
+_CONV_ANNOTATOR_SYSTEM = textwrap.dedent("""
+Eres un experto en el framework ATC21S (Assessment and Teaching of 21st Century Skills).
+
+Lee la conversación COMPLETA entre agentes LLM resolviendo un problema matemático.
+Para CADA una de las 5 dimensiones ATC21S asigna una calidad 0-3 para la conversación completa:
+
+ESCALA DE CALIDAD:
+0 = ausente      — la dimensión no ocurrió en la conversación.
+1 = superficial  — la dimensión ocurrió pero de forma mecánica/guionada, sin coordinación real.
+2 = funcional    — coordinación genuina; hubo necesidad real de la dimensión y se ejerció.
+3 = emergente    — nueva capacidad grupal que ningún agente tenía por separado: síntesis,
+                   corrección mutua, autorregulación conjunta genuina.
+
+Dimensiones a evaluar:
+PC — Participation & Contribution: ¿Los agentes participaron activamente y contribuyeron valor real al trabajo conjunto?
+C  — Communication: ¿Los agentes compartieron información de forma clara, oportuna y útil para el otro?
+Co — Collaboration: ¿Los agentes coordinaron acciones y respondieron a las contribuciones del otro?
+CR — Co-Regulation: ¿Un agente apoyó o scaffoldeó el razonamiento o gestión del otro?
+SR — Shared Regulation: ¿Los agentes monitorearon y regularon conjuntamente el proceso colaborativo?
+
+Responde exclusivamente con JSON válido:
+{{
+  "dim_scores": {{
+    "PC": 0|1|2|3,
+    "C":  0|1|2|3,
+    "Co": 0|1|2|3,
+    "CR": 0|1|2|3,
+    "SR": 0|1|2|3
+  }},
+  "rationale": {{
+    "PC": "...", "C": "...", "Co": "...", "CR": "...", "SR": "..."
+  }}
+}}
+""")
+
+ATC21S_DIMS = ["PC", "C", "Co", "CR", "SR"]
+ATC21S_SOCIAL_DIMS   = ["PC", "C", "Co"]
+ATC21S_COGNITIVE_DIMS = ["CR", "SR"]
+
+
+@dataclass
+class ATC21SAnnotation:
+    problem_id:  str
+    condition:   str
+    dim_scores:  Dict[str, int]    = field(default_factory=dict)   # dim → 0-3
+    atc_cqi:     float             = 0.0   # Σ q_dim / (3*5) ∈ [0,1]
+    social_qi:   float             = 0.0   # Σ q for {PC,C,Co} / 9
+    cogn_qi:     float             = 0.0   # Σ q for {CR,SR} / 6
+    rationale:   Dict[str, str]    = field(default_factory=dict)
+
+
+def _compute_atc_cqi(dim_scores: Dict[str, int]) -> float:
+    return sum(dim_scores.get(d, 0) for d in ATC21S_DIMS) / (3 * len(ATC21S_DIMS))
+
+
+def _compute_social_qi(dim_scores: Dict[str, int]) -> float:
+    return sum(dim_scores.get(d, 0) for d in ATC21S_SOCIAL_DIMS) / (3 * len(ATC21S_SOCIAL_DIMS))
+
+
+def _compute_cogn_qi(dim_scores: Dict[str, int]) -> float:
+    return sum(dim_scores.get(d, 0) for d in ATC21S_COGNITIVE_DIMS) / (3 * len(ATC21S_COGNITIVE_DIMS))
+
+
+def annotate_conversation(conv: Conversation) -> ATC21SAnnotation:
+    """Annotate a conversation with ATC21S quality scores (0-3 per dim, 1 LLM call)."""
+    transcript = "\n".join(
+        f"[Agent {t.agent_id}]: {t.content}" for t in conv.turns
+    )
+    messages = [
+        {"role": "system", "content": _CONV_ANNOTATOR_SYSTEM},
+        {"role": "user",   "content": f"Conversación:\n{transcript}"},
+    ]
+    raw = chat(
+        messages=messages,
+        model=CFG.model_scorer,
+        temperature=0.0,
+        json_mode=True,
+        max_tokens=1000,
+    )
+    data = json.loads(raw)
+    dim_scores = {d: int(data.get("dim_scores", {}).get(d, 0)) for d in ATC21S_DIMS}
+
+    return ATC21SAnnotation(
+        problem_id=conv.problem_id,
+        condition=conv.condition,
+        dim_scores=dim_scores,
+        atc_cqi=round(_compute_atc_cqi(dim_scores), 4),
+        social_qi=round(_compute_social_qi(dim_scores), 4),
+        cogn_qi=round(_compute_cogn_qi(dim_scores), 4),
+        rationale=data.get("rationale", {}),
+    )
