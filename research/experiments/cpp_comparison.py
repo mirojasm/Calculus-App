@@ -48,15 +48,28 @@ PILOT_DIR.mkdir(parents=True, exist_ok=True)
 PILOT_CONV_DIR.mkdir(parents=True, exist_ok=True)
 MODELS_DIR.mkdir(parents=True, exist_ok=True)
 
-ALL_CONDITIONS = ["C1", "C2", "C3", "C4", "C5", "C6"]
+ALL_CONDITIONS = ["C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8"]
 
-# Known correct answers for pilot problems (AMC/AIME style — numeric)
+# Known correct answers loaded at runtime from corpus conversations (ground_truth field).
+# Fallback only — prefer ground_truth from the corpus JSON.
 KNOWN_ANSWERS: dict[str, str] = {
     "math_00014": "26",   # x(3x-7)=-3 → x=(7±√13)/6, m+n+p=7+13+6=26
     "math_00050": "8",    # 712n div by 18 → n=8
     "math_00121": "44",   # sec+tan=22/7 → csc+cot=29/15, m+n=44
     "math_00128": "48",   # (6!+7!)/5! = 5760/120 = 48
 }
+
+def _get_ground_truth(problem_id: str) -> str | None:
+    """Return ground truth from corpus conversation JSON, falling back to KNOWN_ANSWERS."""
+    conv_path = CONV_DIR / f"{problem_id}_jigsaw_2.json"
+    if conv_path.exists():
+        try:
+            gt = json.loads(conv_path.read_text()).get("ground_truth", "")
+            if gt:
+                return str(gt).strip()
+        except Exception:
+            pass
+    return KNOWN_ANSWERS.get(problem_id)
 
 # Redesigned epistemic splits for problems where the CIDI pipeline produces data splits.
 # Applied to conditions C2-C5 (not C1 baseline) to isolate condition effects from split quality.
@@ -80,7 +93,7 @@ def _check_correctness(final_answer: str | None, problem_id: str,
                (e.g., found the intermediate fraction but didn't compute m+n).
     Uses partial_credit_indicators from M1 anatomy when available.
     """
-    known = KNOWN_ANSWERS.get(problem_id)
+    known = _get_ground_truth(problem_id)
     if not known:
         return "unknown"
     if not final_answer or not final_answer.strip():
@@ -515,6 +528,81 @@ def run_c6(
     return result
 
 
+def run_c7(
+    problem_id: str,
+    problem: str,
+    n: int = 2,
+    target_cpp: list[str] = None,
+    skip_validation: bool = False,
+) -> dict:
+    """
+    C7: CIDI epistemic split + student-simulating agent (L3), no joint accountability.
+    Same CIDI split as C2/C6. Agent simulates a Calc-1 student's epistemic process:
+    tentative reasoning, genuine uncertainty, asks partner when stuck.
+    Purpose: proxy for how real students would collaborate on this split.
+    A split that forces CDI/CQI with L3 predicts ecological validity with real students.
+    Tests H4: student-sim agent produces higher PhAQ than L1/L2 on genuine epistemic splits.
+    """
+    target = target_cpp or CPP_DEEP_TARGET
+    t0 = time.time()
+    cidi_result = split_cidi(
+        problem_id, problem, target_cpp=target, n=n,
+        skip_validation=skip_validation,
+    )
+    split_sec = round(time.time() - t0, 1)
+
+    result = _run_with_annotator(
+        "C7", problem_id, problem,
+        cidi_result.split,
+        lambda sr: simulate(sr, f"student_jigsaw_{n}", student_sim=True),
+        extra={
+            "split": cidi_result.split.__dict__,
+            "cidi": cidi_result.to_dict(),
+            "timing": {**cidi_result.timing_sec, "split_sec": split_sec},
+            "student_sim": True,
+            "agent_type": "L3_student_sim",
+        },
+    )
+    return result
+
+
+def run_c8(
+    problem_id: str,
+    problem: str,
+    n: int = 2,
+    target_cpp: list[str] = None,
+    skip_validation: bool = False,
+) -> dict:
+    """
+    C8: CIDI epistemic split + student-simulating agent (L3) + joint accountability.
+    Tests whether JA helps student-sim agents reach convergence without causing
+    premature closure (the C4 pathology observed in piloto v5 math_00121: 4 turns).
+    """
+    target = target_cpp or CPP_DEEP_TARGET
+    t0 = time.time()
+    cidi_result = split_cidi(
+        problem_id, problem, target_cpp=target, n=n,
+        skip_validation=skip_validation,
+    )
+    split_sec = round(time.time() - t0, 1)
+
+    result = _run_with_annotator(
+        "C8", problem_id, problem,
+        cidi_result.split,
+        lambda sr: simulate(sr, f"student_joint_jigsaw_{n}",
+                            student_sim=True, joint_accountability=True),
+        extra={
+            "split": cidi_result.split.__dict__,
+            "cidi": cidi_result.to_dict(),
+            "timing": {**cidi_result.timing_sec, "split_sec": split_sec},
+            "student_sim": True,
+            "joint_accountability": True,
+            "agent_type": "L3_student_sim",
+        },
+    )
+    return result
+
+
 CONDITION_RUNNERS = {
     "C1": lambda pid, prob, n, t, sv: run_c1(pid, prob),
     "C2": lambda pid, prob, n, t, sv: run_c2(pid, prob, n, t, sv),
@@ -522,6 +610,8 @@ CONDITION_RUNNERS = {
     "C4": lambda pid, prob, n, t, sv: run_c4(pid, prob, n, t, sv),
     "C5": lambda pid, prob, n, t, sv: run_c5(pid, prob, n),
     "C6": lambda pid, prob, n, t, sv: run_c6(pid, prob, n, t, sv),
+    "C7": lambda pid, prob, n, t, sv: run_c7(pid, prob, n, t, sv),
+    "C8": lambda pid, prob, n, t, sv: run_c8(pid, prob, n, t, sv),
 }
 
 

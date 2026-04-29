@@ -56,12 +56,10 @@ def _build_jigsaw_system(shared: str, packet: Packet, packets: List[Packet],
                          joint_accountability: bool = False,
                          peer_aware: bool = False) -> str:
     """
-    Minimal collaborative framing (v4/v5).
-    shared_context = goal/question only (no problem data).
-    packet.information = the agent's assigned information (data only, no task hints).
+    L1 (natural) / L2 (peer-aware) minimal collaborative framing.
     joint_accountability: both agents must confirm agreement on the same final answer.
-    peer_aware: adds three lines — communication necessity, reasoning rigor, solvability.
-                Does NOT prescribe coordination strategy; the agent must discover HOW/WHEN.
+    peer_aware (L2): adds communication necessity, reasoning rigor, solvability.
+                     Does NOT prescribe strategy — agent must discover HOW/WHEN.
     """
     context = f"{shared}\n\n{packet.information}".strip() if shared else packet.information
     joint_line = (
@@ -77,6 +75,40 @@ def _build_jigsaw_system(shared: str, packet: Packet, packets: List[Packet],
     return textwrap.dedent(f"""
     You are participating in a collaborative math activity with {n - 1} partner(s).
     You can exchange messages to work on the problem together.{peer_lines}{joint_line}
+
+    {context}
+    """).strip()
+
+
+def _build_student_sim_system(shared: str, packet: Packet, packets: List[Packet],
+                               n: int, agent_id: int,
+                               joint_accountability: bool = False) -> str:
+    """
+    L3 student-simulating agent.
+
+    Simulates a Calculus 1 student's reasoning process — not an expert.
+    Restriction is on EPISTEMIC PROCESS (tentative reasoning, genuine uncertainty,
+    asks when stuck), NOT on knowledge (never claims to "not know" facts the LLM knows).
+    This makes the simulation ecologically valid without being dishonest.
+
+    Purpose: proxy for how real students would collaborate on this split.
+    A split that forces CDI/CQI with L3 predicts real student collaboration.
+    """
+    context = f"{shared}\n\n{packet.information}".strip() if shared else packet.information
+    joint_line = (
+        "\nYou and your partner need to agree on the same final answer before finishing."
+        if joint_accountability else ""
+    )
+    return textwrap.dedent(f"""
+    You are a college student in a mathematics course working with {n - 1} partner(s).
+
+    How you reason and collaborate:
+    - Work step by step, as a student learning — tentative, careful, willing to be wrong.
+    - When you reach a step you are uncertain about, say so and ask your partner.
+    - Do not jump to advanced techniques without verifying each step explicitly first.
+    - You genuinely need your partner to make progress — ask questions, build on their ideas.
+    - Acknowledge when you don't understand something your partner said before continuing.
+    - Show your reasoning aloud, even when unsure. It's fine to say "I think..." or "I'm not sure if..."{joint_line}
 
     {context}
     """).strip()
@@ -226,11 +258,17 @@ def simulate_solo(split_result: SplitResult) -> Conversation:
 
 def simulate_pair(split_result: SplitResult, condition: str,
                   joint_accountability: bool = False,
-                  peer_aware: bool = False) -> Conversation:
+                  peer_aware: bool = False,
+                  student_sim: bool = False) -> Conversation:
     """
     N≥2: jigsaw or unrestricted pair/group conversation.
-    joint_accountability: both agents must each independently state the same FINAL ANSWER.
-    Based on Roschelle (1992) convergence criterion and Szewkis condition 4 (group reward).
+
+    agent_type (via flags):
+      natural      — default, L1: minimal framing
+      peer_aware   — L2: communication necessity + reasoning rigor + solvability
+      student_sim  — L3: student epistemic process simulation (proxy for real students)
+
+    joint_accountability: both agents must confirm agreement on the same FINAL ANSWER.
     """
     n = split_result.n
     packets = split_result.packets
@@ -242,7 +280,13 @@ def simulate_pair(split_result: SplitResult, condition: str,
             systems[pkt.agent_id] = _build_unrestricted_system(
                 split_result.problem, pkt.agent_id, n
             )
-    else:   # jigsaw — uses shared_context (goal only, no problem data)
+    elif student_sim:
+        for pkt in packets:
+            systems[pkt.agent_id] = _build_student_sim_system(
+                split_result.shared_context, pkt, packets, n, pkt.agent_id,
+                joint_accountability=joint_accountability,
+            )
+    else:   # L1 natural or L2 peer_aware — jigsaw with shared_context
         for pkt in packets:
             systems[pkt.agent_id] = _build_jigsaw_system(
                 split_result.shared_context, pkt, packets, n, pkt.agent_id,
@@ -487,14 +531,21 @@ def simulate_with_monitor(
 
 def simulate(split_result: SplitResult, condition: str,
              joint_accountability: bool = False,
-             peer_aware: bool = False) -> Conversation:
+             peer_aware: bool = False,
+             student_sim: bool = False) -> Conversation:
     """
-    condition ∈ {"solo", "unrestricted_pair", "jigsaw_2", "peer_jigsaw_2",
-                 "joint_jigsaw_2", "social_jigsaw_2", ...}
+    Public entry point for all simulation modes.
+
+    condition ∈ {"solo", "unrestricted_pair", "jigsaw_N", "peer_jigsaw_N",
+                 "joint_jigsaw_N", "student_jigsaw_N", "social_jigsaw_N", ...}
+
+    Agent types (mutually exclusive; student_sim takes priority):
+      natural      (default) — L1: minimal framing, acts as LLM expert
+      peer_aware=True        — L2: communication necessity + reasoning rigor
+      student_sim=True       — L3: simulates Calc-1 student epistemic process
+                                   (proxy for ecological validity with real students)
+
     joint_accountability: both agents must confirm agreement on the same final answer.
-    peer_aware: agents are told they need to communicate to solve the problem,
-                must show all reasoning steps, and that the problem has a solution.
-                Does NOT prescribe coordination strategy — Phase A must emerge.
     """
     if not split_result.valid and condition != "solo":
         raise ValueError(
@@ -512,4 +563,5 @@ def simulate(split_result: SplitResult, condition: str,
 
     return simulate_pair(split_result, condition,
                          joint_accountability=joint_accountability,
-                         peer_aware=peer_aware)
+                         peer_aware=peer_aware,
+                         student_sim=student_sim)
