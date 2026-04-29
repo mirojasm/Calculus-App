@@ -49,6 +49,16 @@ KNOWN_ANSWERS: dict[str, str] = {
     "math_00128": "48",   # (6!+7!)/5! = 5760/120 = 48
 }
 
+# Redesigned epistemic splits for problems where the CIDI pipeline produces data splits.
+# Applied to conditions C2-C5 (not C1 baseline) to isolate condition effects from split quality.
+SPLIT_OVERRIDES: dict[str, dict] = {
+    "math_00121": {
+        "shared_context": "A competition problem: find the value of m + n.",
+        "agent_1_info":   "sec θ + tan θ = 22/7",
+        "agent_2_info":   "csc θ + cot θ = m/n where gcd(m, n) = 1. Find m + n.",
+    },
+}
+
 
 def _check_correctness(final_answer: str | None, problem_id: str) -> str:
     """Returns 'correct', 'incorrect', 'incomplete', or 'unknown'."""
@@ -57,13 +67,60 @@ def _check_correctness(final_answer: str | None, problem_id: str) -> str:
         return "unknown"
     if not final_answer or not final_answer.strip():
         return "incomplete"
-    # Normalize: extract numeric part if present
     import re
     nums = re.findall(r"-?\d+(?:\.\d+)?", final_answer)
     if not nums:
         return "incomplete"
-    # Check if any extracted number matches (handles "m+n = 44" → "44")
     return "correct" if known in nums else "incorrect"
+
+
+def _compute_cy(cdi: float, correctness: str) -> float:
+    """
+    Collaborative Yield: combines CDI (process) and correctness (outcome).
+    Awards a coupling bonus when deep collaboration produced the right answer,
+    and penalizes low-process correct answers (trivial/lucky).
+    α=0.35 (process), β=0.45 (outcome), γ=0.20 (coupling bonus).
+    """
+    corr_bin = 1.0 if correctness == "correct" else 0.0
+    if cdi >= 0.5 and correctness == "correct":
+        coupling = 1.0
+    elif cdi < 0.3 and correctness == "correct":
+        coupling = -0.5   # penalize trivial correct
+    else:
+        coupling = 0.0
+    return round(0.35 * cdi + 0.45 * corr_bin + 0.20 * coupling, 3)
+
+
+def _get_quadrant(cdi: float, correctness: str) -> str:
+    """
+    2D process-outcome quadrant (Kapur productive-failure taxonomy):
+      COUPLING      — deep collaboration → correct answer (target state)
+      PROD_FAIL     — deep collaboration → incorrect (productive failure)
+      TRIVIAL       — shallow process → correct (lucky or too easy)
+      COLLAPSE      — shallow process → incorrect
+    """
+    high = cdi >= 0.5
+    corr = correctness == "correct"
+    if high and corr:      return "COUPLING"
+    if high and not corr:  return "PROD_FAIL"
+    if not high and corr:  return "TRIVIAL"
+    return "COLLAPSE"
+
+
+def _apply_split_override(split_result, problem_id: str):
+    """Replace packets for problems with a known better epistemic split."""
+    ov = SPLIT_OVERRIDES.get(problem_id)
+    if not ov:
+        return split_result, False
+    from research.splitting.splitter import Packet
+    split_result.packets = [
+        Packet(agent_id=1, information=ov["agent_1_info"],
+               role_name="", role_description=""),
+        Packet(agent_id=2, information=ov["agent_2_info"],
+               role_name="", role_description=""),
+    ]
+    split_result.shared_context = ov["shared_context"]
+    return split_result, True
 
 
 # ── corpus loading ─────────────────────────────────────────────────────────────
@@ -189,8 +246,13 @@ def _run_with_annotator(
     split_result,
     sim_fn,
     extra: dict = None,
+    apply_override: bool = True,
 ) -> dict:
-    """Common wrapper: simulate + annotate + build result dict."""
+    """Common wrapper: optionally apply split override, simulate, annotate, build result dict."""
+    overridden = False
+    if apply_override:
+        split_result, overridden = _apply_split_override(split_result, problem_id)
+
     t_sim = time.time()
     conv = sim_fn(split_result)
     sim_sec = round(time.time() - t_sim, 1)
@@ -200,18 +262,22 @@ def _run_with_annotator(
     ann_sec = round(time.time() - t_ann, 1)
 
     correctness = _check_correctness(conv.final_answer, problem_id)
+    cdi = cpp.cdi
 
     result = {
-        "condition":     condition_name,
-        "problem_id":    problem_id,
-        "conversation":  conv.to_dict(),
-        "cpp_vector":    cpp.cpp_vector,
-        "cdi":           cpp.cdi,
-        "cdi_label":     cpp.cdi_label,
-        "cpp_rationale": cpp.rationale,
-        "correctness":   correctness,
-        "final_answer":  conv.final_answer,
-        "known_answer":  KNOWN_ANSWERS.get(problem_id),
+        "condition":      condition_name,
+        "problem_id":     problem_id,
+        "conversation":   conv.to_dict(),
+        "cpp_vector":     cpp.cpp_vector,
+        "cdi":            cdi,
+        "cdi_label":      cpp.cdi_label,
+        "cpp_rationale":  cpp.rationale,
+        "correctness":    correctness,
+        "cy":             _compute_cy(cdi, correctness),
+        "quadrant":       _get_quadrant(cdi, correctness),
+        "final_answer":   conv.final_answer,
+        "known_answer":   KNOWN_ANSWERS.get(problem_id),
+        "split_overridden": overridden,
         "timing": {"sim_sec": sim_sec, "annot_sec": ann_sec},
     }
     if extra:
@@ -356,29 +422,51 @@ def _cdi_label(cdi: float) -> str:
 
 
 def _print_summary(results: list[dict]) -> None:
-    print("\n" + "="*88)
-    print("PILOT RESULTS SUMMARY")
-    print("="*88)
-    print(f"{'Problem':<22} {'Cond':<4} {'CDI':>6} {'Profile':<12} {'Turns':>6} "
-          f"{'H.err':>6}  {'Correct?':<10}")
-    print("-"*88)
+    print("\n" + "="*100)
+    print("PILOT v3 RESULTS SUMMARY")
+    print("="*100)
+    print(f"{'Problem':<22} {'Cond':<4} {'CDI':>6} {'CY':>6} {'Quadrant':<12} "
+          f"{'Profile':<12} {'Turns':>6}  {'Correct?':<10}")
+    print("-"*100)
     for r in results:
         if "error" in r:
             print(f"{r.get('problem_id','?'):<22} {r.get('condition','?'):<4}  ERROR: {r['error']}")
             continue
         conv   = r.get("conversation", {})
         turns  = conv.get("total_turns", "?")
-        herr   = r.get("cidi", {}).get("targeting_error", "—")
-        herr_s = f"{herr:.2f}" if isinstance(herr, float) else "  —"
         corr   = r.get("correctness", "?")
         ans    = r.get("final_answer", "") or ""
-        ans_s  = ans[:12] if len(ans) <= 12 else ans[:10]+"…"
+        ans_s  = ans[:10] if len(ans) <= 10 else ans[:8]+"…"
+        ov_flag = "*" if r.get("split_overridden") else " "
         print(
             f"{r['problem_id']:<22} {r['condition']:<4} "
-            f"{r.get('cdi', 0):>6.3f} {r.get('cdi_label','?'):<12} "
-            f"{turns:>6} {herr_s:>6}  {corr:<10} [{ans_s}]"
+            f"{r.get('cdi', 0):>6.3f} {r.get('cy', 0):>6.3f} "
+            f"{r.get('quadrant','?'):<12} "
+            f"{r.get('cdi_label','?'):<12} "
+            f"{turns:>6}{ov_flag} {corr:<10} [{ans_s}]"
         )
-    print("="*88)
+    print("="*100)
+    print("  * = split override applied (epistemic redesign)")
+
+    # Quadrant distribution summary
+    from collections import Counter
+    quads = Counter(r.get("quadrant", "?") for r in results if "error" not in r)
+    print(f"\n  Quadrant distribution: " +
+          " | ".join(f"{q}: {n}" for q, n in sorted(quads.items())))
+
+    # Mean CDI and CY per condition
+    from collections import defaultdict
+    by_cond: dict = defaultdict(list)
+    for r in results:
+        if "error" not in r:
+            by_cond[r["condition"]].append((r.get("cdi", 0), r.get("cy", 0)))
+    print("\n  Per-condition means:")
+    for cond in sorted(by_cond):
+        pairs = by_cond[cond]
+        m_cdi = sum(p[0] for p in pairs) / len(pairs)
+        m_cy  = sum(p[1] for p in pairs) / len(pairs)
+        print(f"    {cond}: CDI={m_cdi:.3f}  CY={m_cy:.3f}  (n={len(pairs)})")
+    print("="*100)
 
 
 # ── main runner ────────────────────────────────────────────────────────────────

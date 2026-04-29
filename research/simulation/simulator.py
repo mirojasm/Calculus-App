@@ -54,66 +54,17 @@ class Conversation:
 def _build_jigsaw_system(shared: str, packet: Packet, packets: List[Packet],
                          n: int, agent_id: int) -> str:
     """
-    CPS-aware jigsaw prompt (v2).
-    Explicitly names the collaborative context, phases, and epistemic constraints
-    so agents know they are in a joint activity and cannot succeed alone.
+    Minimal collaborative framing (v3).
+    Provides context and the agent's view of the problem without prescribing
+    CPS phases, labeling information as private, or asserting what the agent
+    can or cannot do alone — lets the epistemic structure drive collaboration.
     """
-    role_header = f"You are **{packet.role_name}** (Agent {agent_id})." \
-                  if packet.role_name else f"You are Agent {agent_id}."
-
-    partner_lines = []
-    for p in packets:
-        if p.agent_id != agent_id:
-            name = p.role_name or f"Agent {p.agent_id}"
-            desc = f" — {p.role_description}" if p.role_description else ""
-            partner_lines.append(f"  • Agent {p.agent_id}: {name}{desc}")
-    partners_block = "\n".join(partner_lines) if partner_lines else "  (none)"
-    role_desc = f"\nYOUR EXPERTISE: {packet.role_description}" if packet.role_description else ""
-
+    context = f"{shared}\n\n{packet.information}".strip() if shared else packet.information
     return textwrap.dedent(f"""
-    ═══ COLLABORATIVE MATH ACTIVITY ═══
+    You are participating in a collaborative math activity with {n - 1} partner(s).
+    You can exchange messages to work on the problem together.
 
-    You are participating in a COLLABORATIVE problem-solving activity with {n-1} partner(s).
-    This is NOT a solo task — you are solving this TOGETHER.
-
-    {role_header}{role_desc}
-
-    YOUR PARTNER(S):
-{partners_block}
-
-    SHARED CONTEXT (everyone sees this):
-    {shared}
-
-    YOUR PRIVATE INFORMATION (only you have this — your partner has different information):
-    {packet.information}
-
-    ═══ CRITICAL CONSTRAINTS ═══
-    • You CANNOT solve the problem alone — your partner has information you need.
-    • Your partner CANNOT solve it alone — they need your information.
-    • Do NOT invent formulas, identities, or facts not given to you.
-    • Do NOT assume — ask your partner what they know.
-
-    ═══ COLLABORATION PROTOCOL ═══
-    Follow this structure across turns:
-
-    PHASE A — Exploration (turns 1-2):
-      State what you know, what you DON'T know, and ask your partner a specific question.
-      "I know [X]. I don't know [Y]. Can you tell me about [Z]?"
-
-    PHASE B — Representation (turns 3-4):
-      Together build a shared understanding of the approach.
-      "Based on what you shared, I now understand [X]. Our approach should be [Y]."
-
-    PHASE C — Execution (turns 5-6):
-      Carry out the plan. Each agent contributes their part.
-      Verify each other's steps: "You calculated [X] — I verify this is correct because [Y]."
-
-    PHASE D — Verification (turn 7+):
-      Re-read the original question. Confirm your answer addresses it exactly.
-      "The question asked for [original question]. Our answer is [X]. This is correct because [Y]."
-      When both agree: FINAL ANSWER: <answer>
-
-    Be concise: 3–5 sentences per turn. Do not skip phases.
+    {context}
     """).strip()
 
 
@@ -277,15 +228,11 @@ def simulate_pair(split_result: SplitResult, condition: str) -> Conversation:
     shared_transcript: List[dict] = []   # what all agents see
     turns: List[Turn] = []
 
-    # Inject goal-anchor as the opening user message so both agents see it
+    # Goal-anchor: minimal framing with answer format specification
     goal_anchor = (
-        f"COLLABORATIVE TASK — read carefully before responding.\n\n"
-        f"You are solving this problem WITH your partner. "
-        f"Neither of you has all the information needed.\n\n"
-        f"ORIGINAL QUESTION (both agents must answer this exactly):\n"
+        f"COLLABORATIVE TASK:\n\n"
         f"{split_result.problem}\n\n"
-        f"Begin with PHASE A: state what you know, what you don't know, "
-        f"and ask your partner a specific question about their information."
+        f"Your final answer must be a single integer."
     )
 
     agent_order = [((i % n) + 1) for i in range(CFG.max_turns)]
@@ -295,14 +242,13 @@ def simulate_pair(split_result: SplitResult, condition: str) -> Conversation:
         if not history:
             history.append({"role": "user", "content": goal_anchor})
         elif turn_idx == len(agent_order) - 2:
-            # Second-to-last turn: inject verification reminder
+            # Phase D: force group verification before final turn
             history.append({
                 "role": "user",
                 "content": (
-                    "[PHASE D REMINDER] Before finalizing: re-read the original question. "
-                    "Does your current answer address it exactly? "
-                    "If yes, state FINAL ANSWER: <answer>. "
-                    "If not, correct it now."
+                    "[GROUP VERIFICATION] Re-read the original question. "
+                    "Both of you: do you agree on a single integer answer? "
+                    "State FINAL ANSWER: <integer> only when both partners agree."
                 ),
             })
 
