@@ -9,40 +9,67 @@ import json, os, textwrap
 from research.splitting.splitter import SplitResult, Packet
 
 _GENERATION_SYSTEM = textwrap.dedent("""
-Eres un diseñador experto de actividades jigsaw colaborativas para matemáticas.
-Tu objetivo es crear splits EPISTÉMICOS — donde ningún agente pueda resolver el problema
-sin la información del otro (no solo splits de datos).
+Eres un diseñador experto de actividades jigsaw colaborativas para matemáticas (CPS).
+Tu objetivo es crear splits de TAREA EN CADENA donde la colaboración emerge de la
+estructura de la tarea, no de restricciones de conocimiento.
 
-Se te proporciona:
-1. Un problema matemático
-2. Una anatomía estructural del problema
-3. Restricciones derivadas del perfil CPP objetivo
-4. Instrucciones específicas de diseño por celda
+PRINCIPIO CENTRAL — DISEÑO POR ROL DE TAREA:
+Asigna a cada agente una TAREA COMPUTACIONAL que produce un resultado que el otro necesita.
+- NO escribas "no sabes X" ni "tu partner tiene X" — eso pre-computa la exploración y
+  elimina Phase A del framework PISA CPS (Exploring & Understanding).
+- SÍ escribe "tu tarea es computar X a partir de Y" — eso crea cadena funcional sin
+  restringir el conocimiento del agente.
+- La exploración de POR QUÉ el otro necesita tu output, y QUÉ necesitas tú del otro,
+  debe emerger de la conversación (Phase A genuina).
+
+ESTRUCTURA DE TAREA EN CADENA (Split-D):
+1. Identifica la cadena de derivación natural del problema:
+   paso_1 → resultado_intermedio → paso_2 → respuesta_final
+2. Agente 1 recibe el input del paso 1 y la tarea de producir resultado_intermedio
+3. Agente 2 recibe la tarea de aplicar paso_2, que requiere resultado_intermedio de A1
+4. Ninguno puede completar la cadena sin el output del otro
+
+ESTRUCTURA OBLIGATORIA DE CADA PAQUETE:
+"Input: [información/datos disponibles para este agente]
+Task: [qué debe derivar o computar]
+Share: [qué resultado debe comunicar a su partner]
+Needs from partner: [qué resultado necesita recibir para completar la cadena]"
 
 REGLAS ABSOLUTAS:
-- Divide el problema en PERSPECTIVAS DE RAZONAMIENTO, no solo en piezas de información.
-- El split es epistémico si: ni Agente 1 solo ni Agente 2 solo puede formular una ecuación
-  resoluble. Si cualquier agente puede resolver sin el otro, el split es de datos (inaceptable).
-- Cada paquete debe incluir: (a) conocimiento matemático concreto, (b) qué NO sabe el agente,
-  (c) qué debe preguntar al otro.
-- NUNCA incluyas en un paquete una fórmula o identidad matemática que no sea parte del
-  problema original o de conocimiento matemático estándar verificable.
+- shared_context = SOLO la pregunta/objetivo final (sin datos del problema).
+  Ejemplo correcto: "Find the integer m + n."
+  Ejemplo incorrecto: "If sec θ + tan θ = 22/7, find m + n where csc θ + cot θ = m/n."
+  (el segundo revela los datos — ambos agentes los verían y el split sería inútil)
+- NUNCA incluyas en un paquete una fórmula o identidad que no sea parte del problema
+  original o conocimiento matemático estándar verificable.
+- La cadena debe requerir mínimo 2 intercambios secuenciales (no resuelve en 1 turno).
 - NO des la solución completa a ningún agente.
-- El shared_context debe incluir SOLO la pregunta exacta que ambos deben responder.
+
+VALIDACIÓN INTERNA (verifica antes de responder):
+- ¿Puede el Agente 1 completar toda la cadena solo? Si SÍ, rediseña.
+- ¿Puede el Agente 2 completar toda la cadena solo? Si SÍ, rediseña.
+- ¿Combinar ambos produce la respuesta final? Si NO, rediseña.
+- ¿Cada paquete describe una tarea, no una restricción de conocimiento? Si NO, rediseña.
 
 Responde SOLO con JSON válido:
 {
   "pattern": "SPLIT-A|B|C|D|E|F|G",
-  "shared_context": "...",
+  "shared_context": "<SOLO la pregunta/objetivo — sin datos del problema>",
   "agent_roles": [
     {"agent_id": 1, "role_name": "...", "role_description": "..."},
     {"agent_id": 2, "role_name": "...", "role_description": "..."}
   ],
   "packets": [
-    {"agent_id": 1, "information": "..."},
-    {"agent_id": 2, "information": "..."}
+    {"agent_id": 1, "information": "Input: ...\nTask: ...\nShare: ...\nNeeds from partner: ..."},
+    {"agent_id": 2, "information": "Input: ...\nTask: ...\nShare: ...\nNeeds from partner: ..."}
   ],
-  "split_rationale": "...",
+  "split_rationale": "<una oración: qué cadena de derivación se usó y por qué crea interdependencia funcional>",
+  "chain_verification": {
+    "agent1_can_complete_alone": false,
+    "agent2_can_complete_alone": false,
+    "combined_produces_answer": true,
+    "min_exchanges_required": 2
+  },
   "cidi_metadata": {
     "target_cells": [...],
     "design_rules_applied": ["..."]

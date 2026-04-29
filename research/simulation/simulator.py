@@ -52,17 +52,23 @@ class Conversation:
 # ── system prompts ────────────────────────────────────────────────────────────
 
 def _build_jigsaw_system(shared: str, packet: Packet, packets: List[Packet],
-                         n: int, agent_id: int) -> str:
+                         n: int, agent_id: int,
+                         joint_accountability: bool = False) -> str:
     """
-    Minimal collaborative framing (v3).
-    Provides context and the agent's view of the problem without prescribing
-    CPS phases, labeling information as private, or asserting what the agent
-    can or cannot do alone — lets the epistemic structure drive collaboration.
+    Minimal collaborative framing (v4).
+    shared_context = goal/question only (no problem data).
+    packet.information = task-role assignment (what to compute, share, and receive).
+    joint_accountability: if True, both agents must produce the same final answer
+    (Szewkis condition 4 / Roschelle 1992 convergence criterion).
     """
     context = f"{shared}\n\n{packet.information}".strip() if shared else packet.information
+    joint_line = (
+        "\nBoth partners must independently state the same final answer at the end."
+        if joint_accountability else ""
+    )
     return textwrap.dedent(f"""
     You are participating in a collaborative math activity with {n - 1} partner(s).
-    You can exchange messages to work on the problem together.
+    You can exchange messages to work on the problem together.{joint_line}
 
     {context}
     """).strip()
@@ -206,8 +212,13 @@ def simulate_solo(split_result: SplitResult) -> Conversation:
     return conv
 
 
-def simulate_pair(split_result: SplitResult, condition: str) -> Conversation:
-    """N≥2: jigsaw or unrestricted pair/group conversation."""
+def simulate_pair(split_result: SplitResult, condition: str,
+                  joint_accountability: bool = False) -> Conversation:
+    """
+    N≥2: jigsaw or unrestricted pair/group conversation.
+    joint_accountability: both agents must each independently state the same FINAL ANSWER.
+    Based on Roschelle (1992) convergence criterion and Szewkis condition 4 (group reward).
+    """
     n = split_result.n
     packets = split_result.packets
 
@@ -218,25 +229,32 @@ def simulate_pair(split_result: SplitResult, condition: str) -> Conversation:
             systems[pkt.agent_id] = _build_unrestricted_system(
                 split_result.problem, pkt.agent_id, n
             )
-    else:   # jigsaw
+    else:   # jigsaw — uses shared_context (goal only, no problem data)
         for pkt in packets:
             systems[pkt.agent_id] = _build_jigsaw_system(
-                split_result.shared_context, pkt, packets, n, pkt.agent_id
+                split_result.shared_context, pkt, packets, n, pkt.agent_id,
+                joint_accountability=joint_accountability,
             )
 
-    # Conversation histories per agent (each sees only their own + shared transcript)
-    shared_transcript: List[dict] = []   # what all agents see
+    shared_transcript: List[dict] = []
     turns: List[Turn] = []
 
-    # Goal-anchor: minimal framing with dynamic answer format specification from M1
+    # Goal-anchor uses shared_context (goal/question only) — NOT split_result.problem.
+    # split_result.problem contains the full original problem text; broadcasting it
+    # to both agents bypasses the split. shared_context contains only the collaborative
+    # goal/question agreed to be visible to all agents.
     fmt = getattr(split_result, "answer_format", {}) or {}
     format_spec = fmt.get("specification", "").strip()
     if not format_spec:
         format_spec = "State your final answer clearly when both partners agree."
+    joint_line = (
+        "\nBoth partners must each independently state the same final answer."
+        if joint_accountability else ""
+    )
     goal_anchor = (
         f"COLLABORATIVE TASK:\n\n"
-        f"{split_result.problem}\n\n"
-        f"{format_spec}"
+        f"{split_result.shared_context}\n\n"
+        f"{format_spec}{joint_line}"
     )
 
     agent_order = [((i % n) + 1) for i in range(CFG.max_turns)]
@@ -246,13 +264,15 @@ def simulate_pair(split_result: SplitResult, condition: str) -> Conversation:
         if not history:
             history.append({"role": "user", "content": goal_anchor})
         elif turn_idx == len(agent_order) - 2:
-            # Phase D: force group verification before final turn
+            # Phase D: structural group verification — each agent must state answer.
+            # Injected by the simulator (not the agent system prompt) to preserve
+            # minimal framing while ensuring Phase D activation and consensus closure.
             history.append({
                 "role": "user",
                 "content": (
-                    "[GROUP VERIFICATION] Re-read the original question. "
-                    "Both of you: do you agree on a single integer answer? "
-                    "State FINAL ANSWER: <integer> only when both partners agree."
+                    "[GROUP VERIFICATION] Each partner independently states their answer "
+                    "using exactly this format: FINAL ANSWER: [value]. "
+                    "If your answers differ, resolve the discrepancy first."
                 ),
             })
 
@@ -451,11 +471,13 @@ def simulate_with_monitor(
     )
 
 
-def simulate(split_result: SplitResult, condition: str) -> Conversation:
+def simulate(split_result: SplitResult, condition: str,
+             joint_accountability: bool = False) -> Conversation:
     """
     condition ∈ {"solo", "unrestricted_pair", "jigsaw_2", "jigsaw_3", "jigsaw_4",
-                 "social_jigsaw_2", "social_jigsaw_3", "social_jigsaw_4",
-                 "cpp_directed_2", "monitored_jigsaw_2", "integrated_2"}
+                 "social_jigsaw_2", "cpp_directed_2", "joint_jigsaw_2", ...}
+    joint_accountability: expose Roschelle convergence criterion — both agents must
+    each state the same final answer independently (Szewkis condition 4).
     """
     if not split_result.valid and condition != "solo":
         raise ValueError(
@@ -471,4 +493,5 @@ def simulate(split_result: SplitResult, condition: str) -> Conversation:
     if condition in ("monitored_jigsaw_2", "integrated_2"):
         return simulate_with_monitor(split_result, condition)
 
-    return simulate_pair(split_result, condition)
+    return simulate_pair(split_result, condition,
+                         joint_accountability=joint_accountability)

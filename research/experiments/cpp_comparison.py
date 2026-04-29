@@ -1,12 +1,18 @@
 """
-Pilot experiment runner: 4 problems × 5 CPP conditions.
+Pilot experiment runner: 4 problems × 5 CPP conditions (v4).
 
-Conditions:
-  C1  Baseline         — existing splits & conversations (no re-generation)
-  C2  CIDI-Directed    — split_cidi() (6-module pipeline) + standard simulation
+2×2 Factorial design + baseline:
+  C1  Baseline         — existing corpus splits & conversations (no re-generation)
+  C2  CIDI / No-JA     — split_cidi() task-chain split + standard simulation
   C3  Constitutional   — constitutional_split() (36-check critic) + standard simulation
-  C4  Monitor          — standard split + simulate_with_monitor()
-  C5  Integrated       — split_cidi() + simulate_with_monitor()
+  C4  CIDI / JA        — split_cidi() task-chain split + joint accountability
+  C5  Constitutional/JA— constitutional_split() + joint accountability
+
+v4 changes vs v3:
+  - goal_anchor uses shared_context (question only), NOT split_result.problem (data leak fix)
+  - M4 generates task-role chain packets ("Input/Task/Share/Needs from partner")
+  - C4/C5 use joint_accountability instead of Szewkis monitor
+  - GROUP VERIFICATION requires independent answer declaration per partner
 
 Usage:
   python3 -m research.experiments.cpp_comparison
@@ -388,36 +394,16 @@ def run_c4(
     problem_id: str,
     problem: str,
     n: int = 2,
-) -> dict:
-    """C4: Standard split + Szewkis monitor."""
-    t0 = time.time()
-    split_result = standard_split(problem_id, problem, n)
-    split_sec = round(time.time() - t0, 1)
-
-    result = _run_with_annotator(
-        "C4", problem_id, problem,
-        split_result,
-        lambda sr: simulate_with_monitor(sr, f"monitored_jigsaw_{n}"),
-        extra={
-            "split": split_result.__dict__,
-            "timing": {"split_sec": split_sec},
-        },
-    )
-    # Count monitor interventions
-    conv = result.get("conversation", {})
-    n_int = sum(1 for t in conv.get("turns", []) if t.get("agent_id") == 0)
-    result["n_monitor_interventions"] = n_int
-    return result
-
-
-def run_c5(
-    problem_id: str,
-    problem: str,
-    n: int = 2,
     target_cpp: list[str] = None,
     skip_validation: bool = False,
 ) -> dict:
-    """C5: CIDI split + monitor (fully integrated)."""
+    """
+    C4: CIDI epistemic split + joint accountability (Roschelle convergence criterion).
+    Uses the SAME split as C2 to isolate the effect of joint accountability from split quality.
+    Joint accountability: both agents must each independently state the same FINAL ANSWER.
+    Grounded in Szewkis (2011) condition 4 (group reward) and Roschelle (1992) convergence.
+    Replaces Szewkis monitor (which caused incomplete answers under minimal framing).
+    """
     target = target_cpp or CPP_DEEP_TARGET
     t0 = time.time()
     cidi_result = split_cidi(
@@ -427,18 +413,49 @@ def run_c5(
     split_sec = round(time.time() - t0, 1)
 
     result = _run_with_annotator(
-        "C5", problem_id, problem,
+        "C4", problem_id, problem,
         cidi_result.split,
-        lambda sr: simulate_with_monitor(sr, f"integrated_{n}"),
+        lambda sr: simulate(sr, f"joint_jigsaw_{n}", joint_accountability=True),
         extra={
             "split": cidi_result.split.__dict__,
             "cidi": cidi_result.to_dict(),
             "timing": {**cidi_result.timing_sec, "split_sec": split_sec},
+            "joint_accountability": True,
         },
     )
-    conv = result.get("conversation", {})
-    n_int = sum(1 for t in conv.get("turns", []) if t.get("agent_id") == 0)
-    result["n_monitor_interventions"] = n_int
+    return result
+
+
+def run_c5(
+    problem_id: str,
+    problem: str,
+    n: int = 2,
+) -> dict:
+    """
+    C5: Constitutional epistemic split + joint accountability.
+    Uses constitutional split (same as C3) + joint accountability (same as C4).
+    2×2 factorial cell: best split quality × joint accountability.
+    Tests whether constitutional split quality and joint accountability compound.
+    """
+    t0 = time.time()
+    const_result = constitutional_split(problem_id, problem, n)
+    split_sec = round(time.time() - t0, 1)
+
+    result = _run_with_annotator(
+        "C5", problem_id, problem,
+        const_result.split,
+        lambda sr: simulate(sr, f"joint_jigsaw_{n}", joint_accountability=True),
+        extra={
+            "split": const_result.split.__dict__,
+            "constitutional": {
+                "final_sqs":     const_result.final_sqs,
+                "iterations":    const_result.iterations,
+                "approved":      const_result.approved,
+            },
+            "timing": {"split_sec": split_sec},
+            "joint_accountability": True,
+        },
+    )
     return result
 
 
@@ -446,8 +463,8 @@ CONDITION_RUNNERS = {
     "C1": lambda pid, prob, n, t, sv: run_c1(pid, prob),
     "C2": lambda pid, prob, n, t, sv: run_c2(pid, prob, n, t, sv),
     "C3": lambda pid, prob, n, t, sv: run_c3(pid, prob, n),
-    "C4": lambda pid, prob, n, t, sv: run_c4(pid, prob, n),
-    "C5": lambda pid, prob, n, t, sv: run_c5(pid, prob, n, t, sv),
+    "C4": lambda pid, prob, n, t, sv: run_c4(pid, prob, n, t, sv),
+    "C5": lambda pid, prob, n, t, sv: run_c5(pid, prob, n),
 }
 
 
@@ -464,7 +481,7 @@ def _cdi_label(cdi: float) -> str:
 
 def _print_summary(results: list[dict]) -> None:
     print("\n" + "="*100)
-    print("PILOT v3 RESULTS SUMMARY")
+    print("PILOT v4 RESULTS SUMMARY")
     print("="*100)
     print(f"{'Problem':<22} {'Cond':<4} {'CDI':>6} {'CY':>6} {'Quadrant':<12} "
           f"{'Profile':<12} {'Turns':>6}  {'Correct?':<10}")
