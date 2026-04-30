@@ -26,20 +26,7 @@ source .venv/bin/activate
 pip install --require-virtualenv --quiet trl peft bitsandbytes accelerate
 
 # ── model path ────────────────────────────────────────────────────────────────
-# GACRC pre-caches models under /scratch/$USER/llm/models/hf/
-# Check what's available with: ls /scratch/$USER/llm/models/hf/
-MODEL_PATH="/scratch/$USER/llm/models/hf/Meta-Llama-3-8B-Instruct"
-if [ ! -d "$MODEL_PATH" ]; then
-    echo "[WARN] Instruct model not found at $MODEL_PATH"
-    echo "[WARN] Falling back to base model (less ideal for DPO)"
-    MODEL_PATH="/scratch/$USER/llm/models/hf/Meta-Llama-3-8B"
-fi
-if [ ! -d "$MODEL_PATH" ]; then
-    echo "[ERROR] No Llama model found. Run this first on the login node:"
-    echo "  module load Transformers"
-    echo "  python -c \"from huggingface_hub import snapshot_download; snapshot_download('meta-llama/Meta-Llama-3-8B-Instruct', local_dir='/scratch/\$USER/llm/models/hf/Meta-Llama-3-8B-Instruct')\""
-    exit 1
-fi
+MODEL_PATH="/scratch/$USER/llm/models/hf/Mistral-7B-Instruct-v0.3"
 echo "[INFO] Using model: $MODEL_PATH"
 
 # ── step 1: prepare DPO data ──────────────────────────────────────────────────
