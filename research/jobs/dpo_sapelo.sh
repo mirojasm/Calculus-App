@@ -29,19 +29,23 @@ pip install --require-virtualenv --quiet trl peft bitsandbytes accelerate
 MODEL_PATH="/scratch/$USER/llm/models/hf/Mistral-7B-Instruct-v0.3"
 echo "[INFO] Using model: $MODEL_PATH"
 
-# ── step 1: prepare DPO data ──────────────────────────────────────────────────
-echo "=== STEP 1: prepare DPO pairs ==="
-python3 -m research.training.prepare_dpo_data \
-    --pilot-dir outputs/pilot \
-    --train-frac 0.8 \
-    --seed 42
-
-echo ""
-echo "--- DPO dataset stats ---"
-cat outputs/training/dpo_stats.json
-echo ""
+# ── step 1: verify DPO data ───────────────────────────────────────────────────
+# Data was prepared locally and transferred — do not regenerate on Sapelo
+echo "=== STEP 1: verify DPO pairs ==="
+if [ ! -f outputs/training/dpo_train.jsonl ]; then
+    echo "[ERROR] outputs/training/dpo_train.jsonl not found."
+    echo "Transfer it from your local machine first:"
+    echo "  scp outputs/training/dpo_train.jsonl outputs/training/dpo_test.jsonl \\"
+    echo "      mir85108@sapelo2.gacrc.uga.edu:/scratch/mir85108/Calculus-App/outputs/training/"
+    exit 1
+fi
+TRAIN_N=$(wc -l < outputs/training/dpo_train.jsonl)
+TEST_N=$(wc -l < outputs/training/dpo_test.jsonl)
+echo "[OK] dpo_train.jsonl: ${TRAIN_N} pairs"
+echo "[OK] dpo_test.jsonl:  ${TEST_N} pairs"
 
 # ── step 2: DPO fine-tuning ───────────────────────────────────────────────────
+echo ""
 echo "=== STEP 2: DPO fine-tuning ==="
 python3 -m research.training.dpo_train \
     --base-model "$MODEL_PATH" \
