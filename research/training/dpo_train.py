@@ -137,7 +137,6 @@ def train(
         save_strategy="epoch",
         save_total_limit=2,
         max_length=max_length,
-        max_prompt_length=max_length // 2,
         report_to="none",
         remove_unused_columns=False,
     )
