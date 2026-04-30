@@ -16,11 +16,11 @@
 cd $SLURM_SUBMIT_DIR
 mkdir -p logs outputs/training
 
-module load Transformers
-module load datasets
 module load CUDA/12.1.1
 
 source .venv/bin/activate
+# Force venv packages to take priority over any system site-packages
+export PYTHONPATH=$VIRTUAL_ENV/lib/python3.11/site-packages
 
 # TRL must be installed manually per GACRC docs
 pip install --require-virtualenv --quiet trl peft bitsandbytes accelerate
