@@ -170,6 +170,75 @@ def _apply_split_override(split_result, problem_id: str):
     return split_result, True
 
 
+# ── Phase 1 split cache ────────────────────────────────────────────────────────
+# C2, C6, C7 use the same CIDI split. Phase 2 reuses Phase 1 C7 splits to avoid
+# regenerating them (saves ~$0.028/problem and ~15s of gpt-4.1 calls).
+
+_SPLIT_CACHE: dict[str, object] = {}   # problem_id → SplitResult
+
+
+def _reconstruct_split_result(split_dict: dict):
+    """Rebuild a SplitResult from a cached result['split'] dict."""
+    from research.splitting.splitter import SplitResult, Packet
+    raw_packets = split_dict.get("raw_split", {}).get("packets", [])
+    packets = [
+        Packet(
+            agent_id=p["agent_id"],
+            information=p["information"],
+            role_name=p.get("role_name", ""),
+            role_description=p.get("role_description", ""),
+        )
+        for p in raw_packets
+    ]
+    return SplitResult(
+        problem_id=split_dict["problem_id"],
+        problem=split_dict.get("problem", ""),
+        n=split_dict.get("n", 2),
+        pattern=split_dict.get("pattern", ""),
+        shared_context=split_dict.get("shared_context", ""),
+        packets=packets,
+        valid=split_dict.get("valid", True),
+        validation_log=split_dict.get("validation_log", {}),
+        raw_split=split_dict.get("raw_split", {}),
+        answer_format=split_dict.get("answer_format", {}),
+    )
+
+
+def load_phase1_split_cache(problem_ids: list[str] | None = None) -> int:
+    """
+    Scan PILOT_DIR for Phase 1 C7 result files and populate _SPLIT_CACHE.
+    Uses the most recent file per problem_id. Returns number of entries loaded.
+    """
+    pid_set = set(problem_ids) if problem_ids else None
+    best: dict[str, tuple[str, dict]] = {}   # pid → (timestamp, split_dict)
+    for p in PILOT_DIR.glob("math_*_C7_*.json"):
+        parts = p.stem.split("_")
+        if len(parts) < 5:
+            continue
+        pid = f"{parts[0]}_{parts[1]}"
+        ts  = f"{parts[3]}_{parts[4]}"
+        if pid_set and pid not in pid_set:
+            continue
+        try:
+            data = json.loads(p.read_text())
+        except Exception:
+            continue
+        if "error" in data or "split" not in data:
+            continue
+        prev_ts, _ = best.get(pid, ("", {}))
+        if ts > prev_ts:
+            best[pid] = (ts, data["split"])
+
+    loaded = 0
+    for pid, (_, split_dict) in best.items():
+        try:
+            _SPLIT_CACHE[pid] = _reconstruct_split_result(split_dict)
+            loaded += 1
+        except Exception:
+            pass
+    return loaded
+
+
 # ── corpus loading ─────────────────────────────────────────────────────────────
 
 def _load_existing_splits() -> dict:
@@ -397,6 +466,12 @@ def _run_with_annotator(
     return result
 
 
+def _cached_split(problem_id: str, n: int):
+    """Return cached split if it exists and matches n, else None."""
+    sr = _SPLIT_CACHE.get(problem_id)
+    return sr if sr is not None and getattr(sr, "n", n) == n else None
+
+
 def run_c2(
     problem_id: str,
     problem: str,
@@ -406,22 +481,26 @@ def run_c2(
 ) -> dict:
     """C2: CIDI pipeline (6 modules) + standard simulation."""
     target = target_cpp or CPP_DEEP_TARGET
-    t0 = time.time()
-    cidi_result = split_cidi(
-        problem_id, problem, target_cpp=target, n=n,
-        skip_validation=skip_validation,
-    )
-    split_sec = round(time.time() - t0, 1)
+    cached = _cached_split(problem_id, n)
+    if cached is not None:
+        split  = cached
+        timing = {"split_sec": 0.0, "cached": True}
+        extra_cidi = {}
+    else:
+        t0 = time.time()
+        cidi_result = split_cidi(
+            problem_id, problem, target_cpp=target, n=n,
+            skip_validation=skip_validation,
+        )
+        split  = cidi_result.split
+        timing = {**cidi_result.timing_sec, "split_sec": round(time.time() - t0, 1)}
+        extra_cidi = {"cidi": cidi_result.to_dict()}
 
     result = _run_with_annotator(
         "C2", problem_id, problem,
-        cidi_result.split,
+        split,
         lambda sr: simulate(sr, f"cpp_directed_{n}"),
-        extra={
-            "split": cidi_result.split.__dict__,
-            "cidi": cidi_result.to_dict(),
-            "timing": {**cidi_result.timing_sec, "split_sec": split_sec},
-        },
+        extra={"split": split.__dict__, "timing": timing, **extra_cidi},
     )
     return result
 
@@ -541,23 +620,26 @@ def run_c6(
     Tests H3: peer awareness activates Phase A without scripting it.
     """
     target = target_cpp or CPP_DEEP_TARGET
-    t0 = time.time()
-    cidi_result = split_cidi(
-        problem_id, problem, target_cpp=target, n=n,
-        skip_validation=skip_validation,
-    )
-    split_sec = round(time.time() - t0, 1)
+    cached = _cached_split(problem_id, n)
+    if cached is not None:
+        split  = cached
+        timing = {"split_sec": 0.0, "cached": True}
+        extra_cidi = {}
+    else:
+        t0 = time.time()
+        cidi_result = split_cidi(
+            problem_id, problem, target_cpp=target, n=n,
+            skip_validation=skip_validation,
+        )
+        split  = cidi_result.split
+        timing = {**cidi_result.timing_sec, "split_sec": round(time.time() - t0, 1)}
+        extra_cidi = {"cidi": cidi_result.to_dict()}
 
     result = _run_with_annotator(
         "C6", problem_id, problem,
-        cidi_result.split,
+        split,
         lambda sr: simulate(sr, f"peer_jigsaw_{n}", peer_aware=True),
-        extra={
-            "split": cidi_result.split.__dict__,
-            "cidi": cidi_result.to_dict(),
-            "timing": {**cidi_result.timing_sec, "split_sec": split_sec},
-            "peer_aware": True,
-        },
+        extra={"split": split.__dict__, "timing": timing, "peer_aware": True, **extra_cidi},
     )
     return result
 
@@ -578,23 +660,31 @@ def run_c7(
     Tests H4: student-sim agent produces higher PhAQ than L1/L2 on genuine epistemic splits.
     """
     target = target_cpp or CPP_DEEP_TARGET
-    t0 = time.time()
-    cidi_result = split_cidi(
-        problem_id, problem, target_cpp=target, n=n,
-        skip_validation=skip_validation,
-    )
-    split_sec = round(time.time() - t0, 1)
+    cached = _cached_split(problem_id, n)
+    if cached is not None:
+        split  = cached
+        timing = {"split_sec": 0.0, "cached": True}
+        extra_cidi = {}
+    else:
+        t0 = time.time()
+        cidi_result = split_cidi(
+            problem_id, problem, target_cpp=target, n=n,
+            skip_validation=skip_validation,
+        )
+        split  = cidi_result.split
+        timing = {**cidi_result.timing_sec, "split_sec": round(time.time() - t0, 1)}
+        extra_cidi = {"cidi": cidi_result.to_dict()}
 
     result = _run_with_annotator(
         "C7", problem_id, problem,
-        cidi_result.split,
+        split,
         lambda sr: simulate(sr, f"student_jigsaw_{n}", student_sim=True),
         extra={
-            "split": cidi_result.split.__dict__,
-            "cidi": cidi_result.to_dict(),
-            "timing": {**cidi_result.timing_sec, "split_sec": split_sec},
+            "split": split.__dict__,
+            "timing": timing,
             "student_sim": True,
             "agent_type": "L3_student_sim",
+            **extra_cidi,
         },
     )
     return result
@@ -798,6 +888,19 @@ def run_pilot(
     if conditions is None:
         conditions = ALL_CONDITIONS
 
+    # Seed ground-truth answers for corpus-file problems (no jigsaw_2.json on disk).
+    for prob in problems:
+        pid, ans = prob.get("problem_id", ""), prob.get("answer", "")
+        if pid and ans and pid not in KNOWN_ANSWERS:
+            KNOWN_ANSWERS[pid] = str(ans).strip()
+
+    # Pre-load Phase 1 CIDI splits to avoid regenerating them for C2/C6/C7 Phase 2 runs.
+    if any(c in (conditions or ALL_CONDITIONS) for c in ["C2", "C6", "C7"]):
+        pid_list = [p["problem_id"] for p in problems]
+        n_cached = load_phase1_split_cache(pid_list)
+        if n_cached:
+            print(f"[CACHE] {n_cached} Phase 1 CIDI splits loaded (C2/C6/C7 will skip re-generation)")
+
     target = target_cpp or CPP_DEEP_TARGET
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
@@ -858,6 +961,8 @@ def run_pilot(
 def main():
     parser = argparse.ArgumentParser(description="CollabMath CPP pilot experiment")
     parser.add_argument("--problems",    nargs="+", help="Problem IDs (default: auto-select)")
+    parser.add_argument("--corpus-file", help="JSON file with list of problem dicts (for Corpus 2+); "
+                        "each dict needs 'problem_id' and 'problem' fields")
     parser.add_argument("--conditions",  nargs="+", choices=ALL_CONDITIONS,
                         default=ALL_CONDITIONS)
     parser.add_argument("--n",           type=int, default=2)
@@ -877,7 +982,22 @@ def main():
     args = parser.parse_args()
 
     problems = None
-    if args.problems:
+    if args.corpus_file:
+        raw = json.loads(Path(args.corpus_file).read_text())
+        problems = []
+        for item in raw:
+            pid = item.get("problem_id") or item.get("id", "")
+            if not pid:
+                continue
+            problems.append({
+                "problem_id": pid,
+                "problem":    item.get("problem", ""),
+                "subject":    item.get("subject", ""),
+                "level":      item.get("level", 0),
+                "answer":     item.get("answer", ""),
+            })
+        print(f"[INFO] Loaded {len(problems)} problems from {args.corpus_file}")
+    elif args.problems:
         existing_splits = _load_existing_splits()
         existing_convs  = _load_existing_conversations()
         problems = []

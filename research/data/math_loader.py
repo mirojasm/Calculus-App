@@ -62,11 +62,16 @@ def _map_subject(raw: str) -> str:
 def load_math_dataset(
     problems_per_cell: int = CFG.problems_per_cell,
     seed: int = 42,
+    uid_offset: int = 0,
+    exclude_ids: Optional[List[str]] = None,
     cache_path: Optional[str] = None,
 ) -> List[Dict]:
     """
     Returns a stratified sample from EleutherAI/hendrycks_math, balanced across
     (subject × difficulty_level) cells.
+
+    uid_offset: start problem IDs from this number (e.g. 150 for Corpus 2).
+    exclude_ids: set of problem texts (hashed) to exclude — avoids overlap across corpora.
 
     Each item:
     {
@@ -84,6 +89,7 @@ def load_math_dataset(
             return json.load(f)
 
     rng = random.Random(seed)
+    excluded_texts: set[str] = set(exclude_ids or [])
 
     # EleutherAI/hendrycks_math uses per-subject configs
     cells: Dict[tuple, List[Dict]] = {}
@@ -108,17 +114,19 @@ def load_math_dataset(
             cells.setdefault(key, []).append(row)
 
     out: List[Dict] = []
-    uid = 0
+    uid = uid_offset
     for (subj, level), rows in sorted(cells.items()):
-        sample = rng.sample(rows, min(problems_per_cell, len(rows)))
+        available = [r for r in rows
+                     if _clean_latex(r.get("problem", "") or r.get("question", "")) not in excluded_texts]
+        sample = rng.sample(available, min(problems_per_cell, len(available)))
         for row in sample:
-            problem  = row.get("problem", "") or row.get("question", "")
-            solution = row.get("solution", "")
+            problem  = _clean_latex(row.get("problem", "") or row.get("question", ""))
+            solution = _clean_latex(row.get("solution", ""))
             ans = _extract_boxed_answer(solution)
             out.append({
                 "id":       f"math_{uid:05d}",
-                "problem":  _clean_latex(problem),
-                "solution": _clean_latex(solution),
+                "problem":  problem,
+                "solution": solution,
                 "answer":   ans,
                 "subject":  subj,
                 "level":    level,
