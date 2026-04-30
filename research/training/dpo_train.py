@@ -72,7 +72,7 @@ def train(
     bnb_config = BitsAndBytesConfig(
         load_in_4bit=True,
         bnb_4bit_quant_type="nf4",
-        bnb_4bit_compute_dtype=torch.bfloat16,
+        bnb_4bit_compute_dtype=torch.float16,
         bnb_4bit_use_double_quant=True,
     )
 
@@ -86,7 +86,7 @@ def train(
         quantization_config=bnb_config,
         device_map="auto",
         trust_remote_code=True,
-        torch_dtype=torch.bfloat16,
+        torch_dtype=torch.float16,
     )
     model.config.use_cache = False
     model = prepare_model_for_kbit_training(model)
@@ -97,7 +97,7 @@ def train(
         quantization_config=bnb_config,
         device_map="auto",
         trust_remote_code=True,
-        torch_dtype=torch.bfloat16,
+        torch_dtype=torch.float16,
     )
 
     # ── LoRA adapters ─────────────────────────────────────────────────────────
@@ -131,7 +131,7 @@ def train(
         beta=beta,
         lr_scheduler_type="cosine",
         warmup_ratio=0.05,
-        bf16=True,
+        fp16=True,
         logging_steps=5,
         eval_strategy="epoch" if test_ds else "no",
         save_strategy="epoch",
