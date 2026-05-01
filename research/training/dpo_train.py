@@ -84,10 +84,9 @@ def train(
     model = AutoModelForCausalLM.from_pretrained(
         base_model,
         quantization_config=bnb_config,
-        device_map="auto",
+        device_map={"": 0},
         trust_remote_code=True,
         torch_dtype=torch.float16,
-        low_cpu_mem_usage=True,
     )
     model.config.use_cache = False
     model = prepare_model_for_kbit_training(model)
@@ -96,10 +95,9 @@ def train(
     model_ref = AutoModelForCausalLM.from_pretrained(
         base_model,
         quantization_config=bnb_config,
-        device_map="auto",
+        device_map={"": 0},
         trust_remote_code=True,
         torch_dtype=torch.float16,
-        low_cpu_mem_usage=True,
     )
 
     # ── LoRA adapters ─────────────────────────────────────────────────────────
