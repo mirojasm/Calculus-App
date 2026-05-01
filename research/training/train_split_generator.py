@@ -103,17 +103,18 @@ def train(
     model = get_peft_model(model, lora_config)
     model.print_trainable_parameters()
 
-    # TRL 0.11.4 DPOTrainer expects: {"prompt": [...], "chosen": [...], "rejected": [...]}
-    # Our JSONL stores the full conversation in chosen/rejected (system+user+assistant).
-    # Split: prompt = system+user messages, chosen/rejected = assistant message only.
+    # TRL 0.11.4 string format: {"prompt": str, "chosen": str, "rejected": str}
+    # Apply chat template to prompt; chosen/rejected are plain assistant content strings.
     def _reformat(example):
         chosen_msgs   = example["chosen"]
         rejected_msgs = example["rejected"]
-        return {
-            "prompt":   [m for m in chosen_msgs   if m["role"] != "assistant"],
-            "chosen":   [m for m in chosen_msgs   if m["role"] == "assistant"],
-            "rejected": [m for m in rejected_msgs if m["role"] == "assistant"],
-        }
+        prompt_msgs   = [m for m in chosen_msgs if m["role"] != "assistant"]
+        prompt_str    = tokenizer.apply_chat_template(
+            prompt_msgs, tokenize=False, add_generation_prompt=True
+        )
+        chosen_str   = next(m["content"] for m in chosen_msgs   if m["role"] == "assistant")
+        rejected_str = next(m["content"] for m in rejected_msgs if m["role"] == "assistant")
+        return {"prompt": prompt_str, "chosen": chosen_str, "rejected": rejected_str}
 
     train_ds = _load_jsonl(TRAIN_JSONL).map(_reformat, remove_columns=["chosen", "rejected"])
     test_ds  = (_load_jsonl(TEST_JSONL).map(_reformat, remove_columns=["chosen", "rejected"])
