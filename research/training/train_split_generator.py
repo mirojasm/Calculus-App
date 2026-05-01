@@ -103,8 +103,21 @@ def train(
     model = get_peft_model(model, lora_config)
     model.print_trainable_parameters()
 
-    train_ds = _load_jsonl(TRAIN_JSONL)
-    test_ds  = _load_jsonl(TEST_JSONL) if TEST_JSONL.exists() else None
+    # TRL 0.11.4 DPOTrainer expects: {"prompt": [...], "chosen": [...], "rejected": [...]}
+    # Our JSONL stores the full conversation in chosen/rejected (system+user+assistant).
+    # Split: prompt = system+user messages, chosen/rejected = assistant message only.
+    def _reformat(example):
+        chosen_msgs   = example["chosen"]
+        rejected_msgs = example["rejected"]
+        return {
+            "prompt":   [m for m in chosen_msgs   if m["role"] != "assistant"],
+            "chosen":   [m for m in chosen_msgs   if m["role"] == "assistant"],
+            "rejected": [m for m in rejected_msgs if m["role"] == "assistant"],
+        }
+
+    train_ds = _load_jsonl(TRAIN_JSONL).map(_reformat, remove_columns=["chosen", "rejected"])
+    test_ds  = (_load_jsonl(TEST_JSONL).map(_reformat, remove_columns=["chosen", "rejected"])
+                if TEST_JSONL.exists() else None)
     print(f"[INFO] Train examples: {len(train_ds)}")
     if test_ds:
         print(f"[INFO] Test  examples: {len(test_ds)}")
