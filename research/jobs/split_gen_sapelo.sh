@@ -21,7 +21,7 @@ module load CUDA/12.1.1
 source .venv/bin/activate
 export PYTHONPATH=$VIRTUAL_ENV/lib/python3.11/site-packages
 
-pip install --require-virtualenv --quiet trl peft bitsandbytes accelerate
+pip install --require-virtualenv --quiet "trl==0.11.4" "peft" "bitsandbytes" "accelerate>=0.27.0"
 
 # ── model path ────────────────────────────────────────────────────────────────
 MODEL_PATH="/scratch/$USER/llm/models/hf/Mistral-7B-Instruct-v0.3"
