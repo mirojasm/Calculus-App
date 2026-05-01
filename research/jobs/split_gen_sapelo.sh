@@ -49,9 +49,9 @@ echo ""
 echo "=== STEP 2: Split generator DPO fine-tuning ==="
 python3 -m research.training.train_split_generator \
     --base-model "$MODEL_PATH" \
-    --epochs 3 \
+    --epochs 1 \
     --lr 5e-5 \
-    --beta 0.15 \
+    --beta 0.05 \
     --batch-size 1 \
     --grad-accum 8 \
     --max-length 3072 \

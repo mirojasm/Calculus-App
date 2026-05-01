@@ -43,6 +43,7 @@ OUT_FULL    = TRAIN_DIR / "split_dpo_pairs_full.jsonl"
 NAIVE_MODEL = "gpt-4o-mini"
 MIN_CDI     = 0.5
 TRAIN_FRAC  = 0.8
+N_NAIVE     = 3   # naive splits generated per chosen split (data augmentation)
 
 
 # ── system prompt for DPO training ────────────────────────────────────────────
@@ -200,39 +201,43 @@ def _is_naive_inferior(chosen_raw: dict, naive_raw: dict) -> bool:
     return True
 
 
-def build_pairs(best_c7: dict[str, dict]) -> list[dict]:
+def build_pairs(best_c7: dict[str, dict], n_naive: int = N_NAIVE) -> list[dict]:
     pairs = []
     pids = sorted(best_c7.keys())
-    print(f"[INFO] Generating naive splits for {len(pids)} problems...")
+    print(f"[INFO] Generating {n_naive} naive splits × {len(pids)} problems...")
     for i, pid in enumerate(pids):
         d        = best_c7[pid]
         split    = d["split"]
         problem  = split.get("problem", "")
         chosen_r = split["raw_split"]
 
-        naive_r = _generate_naive_split(problem)
-        if not _is_naive_inferior(chosen_r, naive_r):
-            print(f"  [{i+1:>3}] {pid}  SKIP (naive indistinguishable or None)")
-            continue
-
-        # Strip M4-specific metadata fields not needed for training
         chosen_clean = {k: chosen_r[k] for k in
                         ["pattern", "shared_context", "packets", "interdependence_check"]
                         if k in chosen_r}
-        naive_clean  = {k: naive_r[k]  for k in
-                        ["pattern", "shared_context", "packets", "interdependence_check"]
-                        if k in naive_r}
 
-        pairs.append({
-            "problem_id":   pid,
-            "cdi_chosen":   d.get("cdi", 0.0),
-            "problem":      problem,
-            "chosen_raw":   chosen_clean,
-            "rejected_raw": naive_clean,
-            "chosen":       _build_messages(problem, chosen_clean),
-            "rejected":     _build_messages(problem, naive_clean),
-        })
-        print(f"  [{i+1:>3}] {pid}  CDI={d.get('cdi',0):.3f}  OK")
+        generated = 0
+        for _attempt in range(n_naive * 2):   # extra attempts to reach n_naive valid pairs
+            if generated >= n_naive:
+                break
+            naive_r = _generate_naive_split(problem)
+            if not _is_naive_inferior(chosen_r, naive_r):
+                continue
+            naive_clean = {k: naive_r[k] for k in
+                           ["pattern", "shared_context", "packets", "interdependence_check"]
+                           if k in naive_r}
+            pairs.append({
+                "problem_id":   pid,
+                "cdi_chosen":   d.get("cdi", 0.0),
+                "problem":      problem,
+                "chosen_raw":   chosen_clean,
+                "rejected_raw": naive_clean,
+                "chosen":       _build_messages(problem, chosen_clean),
+                "rejected":     _build_messages(problem, naive_clean),
+            })
+            generated += 1
+
+        status = f"OK ({generated}/{n_naive})" if generated > 0 else "SKIP (0 valid)"
+        print(f"  [{i+1:>3}] {pid}  CDI={d.get('cdi',0):.3f}  {status}")
 
     return pairs
 
@@ -257,14 +262,15 @@ def _split_by_problem(pairs: list[dict],
 
 def prepare(min_cdi: float = MIN_CDI,
             train_frac: float = TRAIN_FRAC,
-            seed: int = 42) -> tuple[list[dict], list[dict]]:
+            seed: int = 42,
+            n_naive: int = N_NAIVE) -> tuple[list[dict], list[dict]]:
     TRAIN_DIR.mkdir(parents=True, exist_ok=True)
 
     print(f"[INFO] Loading best C7 splits (CDI >= {min_cdi})...")
     best_c7 = _load_best_c7(min_cdi)
     print(f"       {len(best_c7)} problems")
 
-    pairs = build_pairs(best_c7)
+    pairs = build_pairs(best_c7, n_naive=n_naive)
     print(f"\n[INFO] Usable pairs: {len(pairs)} / {len(best_c7)}")
 
     train_pairs, test_pairs = _split_by_problem(pairs, train_frac, seed)
@@ -285,13 +291,14 @@ def prepare(min_cdi: float = MIN_CDI,
 
     stats = {
         "total_pairs":    len(pairs),
-        "skipped":        len(best_c7) - len(pairs),
+        "skipped":        len(best_c7) - len({p["problem_id"] for p in pairs}),
         "train_pairs":    len(train_pairs),
         "test_pairs":     len(test_pairs),
         "train_problems": len({p["problem_id"] for p in train_pairs}),
         "test_problems":  len({p["problem_id"] for p in test_pairs}),
         "cdi_chosen_mean": round(sum(p["cdi_chosen"] for p in pairs) / len(pairs), 3) if pairs else 0,
         "min_cdi_filter": min_cdi,
+        "n_naive":        n_naive,
         "seed": seed,
     }
     OUT_STATS.write_text(json.dumps(stats, indent=2))
@@ -308,8 +315,11 @@ def main() -> None:
     parser.add_argument("--min-cdi",    type=float, default=MIN_CDI)
     parser.add_argument("--train-frac", type=float, default=TRAIN_FRAC)
     parser.add_argument("--seed",       type=int,   default=42)
+    parser.add_argument("--n-naive",    type=int,   default=N_NAIVE,
+                        help="naive splits generated per chosen split (default 3)")
     args = parser.parse_args()
-    prepare(min_cdi=args.min_cdi, train_frac=args.train_frac, seed=args.seed)
+    prepare(min_cdi=args.min_cdi, train_frac=args.train_frac, seed=args.seed,
+            n_naive=args.n_naive)
 
 
 if __name__ == "__main__":
