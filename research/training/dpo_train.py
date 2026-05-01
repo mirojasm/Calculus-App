@@ -3,7 +3,9 @@ DPO fine-tuning of an open-source LLM to generate L3 (student-sim) collaborative
 
 Base model: meta-llama/Llama-3.1-8B-Instruct  (or Mistral-7B-Instruct-v0.3)
 Method:     Direct Preference Optimization (Rafailov et al. 2023) via TRL
-Adapter:    QLoRA 4-bit (fits in ~14 GB VRAM; single A100-40 GB on Sapelo)
+Adapter:    LoRA float16 — no bitsandbytes quantization.
+            Mistral-7B fp16 = ~14 GB; both model + ref fit in A100-40 GB (~28 GB total).
+            Avoids the bitsandbytes + accelerate dispatch_model incompatibility on Sapelo.
 
 The training signal: conversations with CDI≥0.5 (deep collaboration) are preferred
 over CDI<0.5 conversations on the same problem. The model learns to produce the
@@ -11,7 +13,7 @@ exploratory, question-rich first-turn style that drives higher CDI.
 
 Prerequisites
 -------------
-  pip install transformers datasets peft trl bitsandbytes accelerate
+  pip install transformers datasets peft trl accelerate
 
 Usage
 -----
@@ -39,20 +41,20 @@ def _load_jsonl(path: Path):
 
 
 def train(
-    base_model:  str   = DEFAULT_BASE,
-    epochs:      int   = 2,
-    lr:          float = 5e-5,
-    beta:        float = 0.1,
-    batch_size:  int   = 1,
-    grad_accum:  int   = 8,
-    max_length:  int   = 2048,
-    lora_r:      int   = 16,
-    lora_alpha:  int   = 32,
+    base_model:   str   = DEFAULT_BASE,
+    epochs:       int   = 2,
+    lr:           float = 5e-5,
+    beta:         float = 0.1,
+    batch_size:   int   = 1,
+    grad_accum:   int   = 8,
+    max_length:   int   = 2048,
+    lora_r:       int   = 16,
+    lora_alpha:   int   = 32,
     lora_dropout: float = 0.05,
 ) -> None:
     import torch
-    from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
-    from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
+    from transformers import AutoTokenizer, AutoModelForCausalLM
+    from peft import LoraConfig, get_peft_model
     from trl import DPOTrainer, DPOConfig
 
     if not TRAIN_JSONL.exists():
@@ -67,39 +69,26 @@ def train(
     print(f"[INFO] Epochs        : {epochs}")
     print(f"[INFO] Batch×Accum   : {batch_size}×{grad_accum} = {batch_size * grad_accum} eff.")
     print(f"[INFO] LoRA r / alpha: {lora_r} / {lora_alpha}")
-
-    # ── 4-bit quantization ────────────────────────────────────────────────────
-    bnb_config = BitsAndBytesConfig(
-        load_in_4bit=True,
-        bnb_4bit_quant_type="nf4",
-        bnb_4bit_compute_dtype=torch.float16,
-        bnb_4bit_use_double_quant=True,
-    )
+    print(f"[INFO] Precision     : float16 (no quantization — fits A100-40GB)")
 
     tokenizer = AutoTokenizer.from_pretrained(base_model, trust_remote_code=True)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
-    tokenizer.padding_side = "left"   # DPO prefers left-padding
+    tokenizer.padding_side = "left"
 
+    # Load in float16 directly to CUDA — no bitsandbytes, no device_map, no dispatch_model
     model = AutoModelForCausalLM.from_pretrained(
         base_model,
-        quantization_config=bnb_config,
-        trust_remote_code=True,
         torch_dtype=torch.float16,
-        # No device_map: bitsandbytes 4-bit places layers on CUDA automatically.
-        # device_map (any value) triggers accelerate's dispatch_model which calls
-        # model.to(device) — unsupported on quantized models.
-    )
+        trust_remote_code=True,
+    ).cuda()
     model.config.use_cache = False
-    model = prepare_model_for_kbit_training(model)
 
-    # Reference model: same weights but frozen (no LoRA)
     model_ref = AutoModelForCausalLM.from_pretrained(
         base_model,
-        quantization_config=bnb_config,
-        trust_remote_code=True,
         torch_dtype=torch.float16,
-    )
+        trust_remote_code=True,
+    ).cuda()
 
     # ── LoRA adapters ─────────────────────────────────────────────────────────
     lora_config = LoraConfig(
@@ -162,6 +151,7 @@ def train(
 
     meta = {
         "base_model":  base_model,
+        "precision":   "float16",
         "epochs":      epochs,
         "beta":        beta,
         "lora_r":      lora_r,

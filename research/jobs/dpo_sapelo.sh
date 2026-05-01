@@ -23,7 +23,7 @@ source .venv/bin/activate
 export PYTHONPATH=$VIRTUAL_ENV/lib/python3.11/site-packages
 
 # TRL must be installed manually per GACRC docs
-pip install --require-virtualenv --quiet "trl==0.11.4" "peft" "bitsandbytes" "accelerate>=0.27.0"
+pip install --require-virtualenv --quiet "trl==0.11.4" "peft" "accelerate"
 
 # ── model path ────────────────────────────────────────────────────────────────
 MODEL_PATH="/scratch/$USER/llm/models/hf/Mistral-7B-Instruct-v0.3"

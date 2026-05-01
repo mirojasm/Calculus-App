@@ -3,7 +3,9 @@ DPO fine-tuning of an open-source LLM to generate CIDI-quality jigsaw splits.
 
 Base model: meta-llama/Llama-3.1-8B-Instruct  (or Mistral-7B-Instruct-v0.3)
 Method:     Direct Preference Optimization (Rafailov et al. 2023) via TRL
-Adapter:    QLoRA 4-bit (same setup as dpo_train.py for the agent)
+Adapter:    LoRA float16 — no bitsandbytes quantization.
+            Mistral-7B fp16 = ~14 GB; both model + ref fit in A100-40 GB (~28 GB total).
+            Avoids the bitsandbytes + accelerate dispatch_model incompatibility on Sapelo.
 
 The training signal: CIDI splits (CDI >= 0.5 in C7 conversations) are preferred
 over naive "divide it in half" splits. The model learns to produce splits that
@@ -11,7 +13,7 @@ satisfy Szewkis positive interdependence from the problem text alone.
 
 Prerequisites
 -------------
-  Same as dpo_train.py (trl==0.11.4, transformers==4.44.0, torch==2.5.1+cu121)
+  pip install transformers datasets peft trl accelerate
 
 Usage
 -----
@@ -42,17 +44,17 @@ def train(
     base_model:    str   = DEFAULT_BASE,
     epochs:        int   = 3,
     lr:            float = 5e-5,
-    beta:          float = 0.15,   # slightly higher than agent DPO — split pairs are harder
+    beta:          float = 0.15,
     batch_size:    int   = 1,
     grad_accum:    int   = 8,
-    max_length:    int   = 3072,   # splits are longer than agent turns
+    max_length:    int   = 3072,
     lora_r:        int   = 16,
     lora_alpha:    int   = 32,
     lora_dropout:  float = 0.05,
 ) -> None:
     import torch
-    from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
-    from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
+    from transformers import AutoTokenizer, AutoModelForCausalLM
+    from peft import LoraConfig, get_peft_model
     from trl import DPOTrainer, DPOConfig
 
     if not TRAIN_JSONL.exists():
@@ -68,37 +70,26 @@ def train(
     print(f"[INFO] Batch×Accum   : {batch_size}×{grad_accum} = {batch_size * grad_accum} eff.")
     print(f"[INFO] LoRA r / alpha: {lora_r} / {lora_alpha}")
     print(f"[INFO] Max length    : {max_length} (splits longer than agent turns)")
-
-    bnb_config = BitsAndBytesConfig(
-        load_in_4bit=True,
-        bnb_4bit_quant_type="nf4",
-        bnb_4bit_compute_dtype=torch.float16,
-        bnb_4bit_use_double_quant=True,
-    )
+    print(f"[INFO] Precision     : float16 (no quantization — fits A100-40GB)")
 
     tokenizer = AutoTokenizer.from_pretrained(base_model, trust_remote_code=True)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
     tokenizer.padding_side = "left"
 
+    # Load in float16 directly to CUDA — no bitsandbytes, no device_map, no dispatch_model
     model = AutoModelForCausalLM.from_pretrained(
         base_model,
-        quantization_config=bnb_config,
-        trust_remote_code=True,
         torch_dtype=torch.float16,
-        # No device_map: bitsandbytes 4-bit places layers on CUDA automatically.
-        # device_map (any value) triggers accelerate's dispatch_model which calls
-        # model.to(device) — unsupported on quantized models.
-    )
+        trust_remote_code=True,
+    ).cuda()
     model.config.use_cache = False
-    model = prepare_model_for_kbit_training(model)
 
     model_ref = AutoModelForCausalLM.from_pretrained(
         base_model,
-        quantization_config=bnb_config,
-        trust_remote_code=True,
         torch_dtype=torch.float16,
-    )
+        trust_remote_code=True,
+    ).cuda()
 
     lora_config = LoraConfig(
         r=lora_r,
@@ -158,6 +149,7 @@ def train(
     meta = {
         "base_model":  base_model,
         "task":        "split_generator",
+        "precision":   "float16",
         "epochs":      epochs,
         "beta":        beta,
         "lora_r":      lora_r,
