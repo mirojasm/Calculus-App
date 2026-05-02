@@ -16,6 +16,7 @@ cd $SLURM_SUBMIT_DIR
 mkdir -p logs outputs/eval
 
 module load CUDA/12.1.1
+source ~/.bashrc 2>/dev/null || true
 source .venv/bin/activate
 export PYTHONPATH=$VIRTUAL_ENV/lib/python3.11/site-packages
 
