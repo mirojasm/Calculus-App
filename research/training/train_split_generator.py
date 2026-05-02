@@ -1,25 +1,16 @@
 """
-DPO fine-tuning of an open-source LLM to generate CIDI-quality jigsaw splits.
+SFT fine-tuning of Mistral-7B-Instruct to generate CIDI-quality jigsaw splits.
 
-Base model: meta-llama/Llama-3.1-8B-Instruct  (or Mistral-7B-Instruct-v0.3)
-Method:     Direct Preference Optimization (Rafailov et al. 2023) via TRL
-Adapter:    LoRA float16 — no bitsandbytes quantization.
-            Mistral-7B fp16 = ~14 GB; both model + ref fit in A100-40 GB (~28 GB total).
-            Avoids the bitsandbytes + accelerate dispatch_model incompatibility on Sapelo.
+Switched from DPO to SFT because DPO collapsed (both chosen/rejected logps diverge
+from reference while margins inflate — model escapes distribution rather than learning
+the split format). SFT is appropriate here: the task is format learning, not preference
+ranking between two plausible outputs.
 
-The training signal: CIDI splits (CDI >= 0.5 in C7 conversations) are preferred
-over naive "divide it in half" splits. The model learns to produce splits that
-satisfy Szewkis positive interdependence from the problem text alone.
+Training signal: the 333 chosen (CIDI, CDI >= 0.5) splits from the existing DPO JSONL.
+At inference: generate a split, evaluate CDI, filter (sample-then-filter pipeline).
 
-Prerequisites
--------------
-  pip install transformers datasets peft trl accelerate
-
-Usage
------
-  python -m research.training.train_split_generator
-  python -m research.training.train_split_generator --base-model mistralai/Mistral-7B-Instruct-v0.3
-  python -m research.training.train_split_generator --epochs 3 --beta 0.15
+Data: reuses outputs/training/split_dpo_{train,test}.jsonl — extracts "chosen" field only.
+No need to regenerate or re-transfer data to Sapelo.
 """
 from __future__ import annotations
 import argparse, json
@@ -31,65 +22,61 @@ OUTPUT_DIR   = Path("outputs/training/split_adapter")
 DEFAULT_BASE = "meta-llama/Llama-3.1-8B-Instruct"
 
 
-def _load_jsonl(path: Path):
+def _load_sft_dataset(path: Path, tokenizer):
     from datasets import Dataset
     records = []
     with open(path, encoding="utf-8") as f:
         for line in f:
-            records.append(json.loads(line))
+            d = json.loads(line)
+            chosen_msgs = d["chosen"]  # [system, user, assistant]
+            text = tokenizer.apply_chat_template(
+                chosen_msgs, tokenize=False, add_generation_prompt=False
+            )
+            records.append({"text": text})
     return Dataset.from_list(records)
 
 
 def train(
     base_model:    str   = DEFAULT_BASE,
     epochs:        int   = 3,
-    lr:            float = 5e-5,
-    beta:          float = 0.15,
+    lr:            float = 2e-5,
     batch_size:    int   = 1,
     grad_accum:    int   = 8,
-    max_length:    int   = 3072,
+    max_length:    int   = 2048,
     lora_r:        int   = 16,
     lora_alpha:    int   = 32,
     lora_dropout:  float = 0.05,
 ) -> None:
     import torch
     from transformers import AutoTokenizer, AutoModelForCausalLM
-    from peft import LoraConfig, get_peft_model
-    from trl import DPOTrainer, DPOConfig
+    from peft import LoraConfig
+    from trl import SFTTrainer, SFTConfig
 
     if not TRAIN_JSONL.exists():
-        raise FileNotFoundError(
-            f"{TRAIN_JSONL} not found. Run prepare_split_dpo_data.py first."
-        )
+        raise FileNotFoundError(f"{TRAIN_JSONL} not found.")
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     print(f"[INFO] Base model    : {base_model}")
-    print(f"[INFO] DPO beta      : {beta}")
+    print(f"[INFO] Method        : SFT (chosen splits only, no reference model)")
     print(f"[INFO] Epochs        : {epochs}")
+    print(f"[INFO] LR            : {lr}")
     print(f"[INFO] Batch×Accum   : {batch_size}×{grad_accum} = {batch_size * grad_accum} eff.")
     print(f"[INFO] LoRA r / alpha: {lora_r} / {lora_alpha}")
-    print(f"[INFO] Max length    : {max_length} (splits longer than agent turns)")
+    print(f"[INFO] Max length    : {max_length}")
     print(f"[INFO] Precision     : float16 (no quantization — fits A100-40GB)")
 
     tokenizer = AutoTokenizer.from_pretrained(base_model, trust_remote_code=True)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
-    tokenizer.padding_side = "left"
+    tokenizer.padding_side = "right"
 
-    # Load in float16 directly to CUDA — no bitsandbytes, no device_map, no dispatch_model
     model = AutoModelForCausalLM.from_pretrained(
         base_model,
         torch_dtype=torch.float16,
         trust_remote_code=True,
     ).cuda()
     model.config.use_cache = False
-
-    model_ref = AutoModelForCausalLM.from_pretrained(
-        base_model,
-        torch_dtype=torch.float16,
-        trust_remote_code=True,
-    ).cuda()
 
     lora_config = LoraConfig(
         r=lora_r,
@@ -100,97 +87,80 @@ def train(
         target_modules=["q_proj", "v_proj", "k_proj", "o_proj",
                         "gate_proj", "up_proj", "down_proj"],
     )
-    model = get_peft_model(model, lora_config)
-    model.print_trainable_parameters()
 
-    # TRL 0.11.4 string format: {"prompt": str, "chosen": str, "rejected": str}
-    # Apply chat template to prompt; chosen/rejected are plain assistant content strings.
-    def _reformat(example):
-        chosen_msgs   = example["chosen"]
-        rejected_msgs = example["rejected"]
-        prompt_msgs   = [m for m in chosen_msgs if m["role"] != "assistant"]
-        prompt_str    = tokenizer.apply_chat_template(
-            prompt_msgs, tokenize=False, add_generation_prompt=True
-        )
-        chosen_str   = next(m["content"] for m in chosen_msgs   if m["role"] == "assistant")
-        rejected_str = next(m["content"] for m in rejected_msgs if m["role"] == "assistant")
-        return {"prompt": prompt_str, "chosen": chosen_str, "rejected": rejected_str}
-
-    train_ds = _load_jsonl(TRAIN_JSONL).map(_reformat, remove_columns=["chosen", "rejected"])
-    test_ds  = (_load_jsonl(TEST_JSONL).map(_reformat, remove_columns=["chosen", "rejected"])
-                if TEST_JSONL.exists() else None)
+    train_ds = _load_sft_dataset(TRAIN_JSONL, tokenizer)
+    test_ds  = _load_sft_dataset(TEST_JSONL, tokenizer) if TEST_JSONL.exists() else None
     print(f"[INFO] Train examples: {len(train_ds)}")
     if test_ds:
         print(f"[INFO] Test  examples: {len(test_ds)}")
 
-    dpo_config = DPOConfig(
+    sft_config = SFTConfig(
         output_dir=str(OUTPUT_DIR),
         num_train_epochs=epochs,
         per_device_train_batch_size=batch_size,
         per_device_eval_batch_size=batch_size,
         gradient_accumulation_steps=grad_accum,
         learning_rate=lr,
-        beta=beta,
         lr_scheduler_type="cosine",
-        warmup_ratio=0.05,
+        warmup_ratio=0.1,
         fp16=True,
         logging_steps=5,
         eval_strategy="epoch" if test_ds else "no",
         save_strategy="epoch",
         save_total_limit=2,
-        max_length=max_length,
+        max_seq_length=max_length,
+        dataset_text_field="text",
+        packing=False,
         report_to="none",
-        remove_unused_columns=False,
     )
 
-    trainer = DPOTrainer(
+    trainer = SFTTrainer(
         model=model,
-        ref_model=model_ref,
-        args=dpo_config,
+        args=sft_config,
         train_dataset=train_ds,
         eval_dataset=test_ds,
+        peft_config=lora_config,
         tokenizer=tokenizer,
     )
 
-    print("[INFO] Starting DPO training (split generator)...")
+    print("[INFO] Starting SFT training (split generator)...")
     trainer.train()
 
     adapter_path = OUTPUT_DIR / "final_adapter"
-    model.save_pretrained(str(adapter_path))
+    trainer.model.save_pretrained(str(adapter_path))
     tokenizer.save_pretrained(str(adapter_path))
     print(f"[INFO] Adapter saved → {adapter_path}")
 
     meta = {
         "base_model":  base_model,
+        "method":      "SFT",
         "task":        "split_generator",
         "precision":   "float16",
         "epochs":      epochs,
-        "beta":        beta,
+        "lr":          lr,
         "lora_r":      lora_r,
         "lora_alpha":  lora_alpha,
         "train_size":  len(train_ds),
         "test_size":   len(test_ds) if test_ds else 0,
     }
     (OUTPUT_DIR / "train_meta.json").write_text(json.dumps(meta, indent=2))
-    print("[INFO] Split generator DPO fine-tuning complete.")
+    print("[INFO] Split generator SFT fine-tuning complete.")
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--base-model",  default=DEFAULT_BASE)
     parser.add_argument("--epochs",      type=int,   default=3)
-    parser.add_argument("--lr",          type=float, default=5e-5)
-    parser.add_argument("--beta",        type=float, default=0.15)
+    parser.add_argument("--lr",          type=float, default=2e-5)
     parser.add_argument("--batch-size",  type=int,   default=1)
     parser.add_argument("--grad-accum",  type=int,   default=8)
-    parser.add_argument("--max-length",  type=int,   default=3072)
+    parser.add_argument("--max-length",  type=int,   default=2048)
     parser.add_argument("--lora-r",      type=int,   default=16)
     args = parser.parse_args()
     train(
         base_model=args.base_model,
         epochs=args.epochs,
         lr=args.lr,
-        beta=args.beta,
         batch_size=args.batch_size,
         grad_accum=args.grad_accum,
         max_length=args.max_length,

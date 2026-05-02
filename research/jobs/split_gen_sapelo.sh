@@ -44,17 +44,16 @@ TEST_N=$(wc -l < outputs/training/split_dpo_test.jsonl)
 echo "[OK] split_dpo_train.jsonl: ${TRAIN_N} pairs"
 echo "[OK] split_dpo_test.jsonl:  ${TEST_N} pairs"
 
-# ── step 2: split generator DPO fine-tuning ───────────────────────────────────
+# ── step 2: split generator SFT fine-tuning ───────────────────────────────────
 echo ""
-echo "=== STEP 2: Split generator DPO fine-tuning ==="
+echo "=== STEP 2: Split generator SFT fine-tuning ==="
 python3 -m research.training.train_split_generator \
     --base-model "$MODEL_PATH" \
-    --epochs 2 \
-    --lr 5e-5 \
-    --beta 0.08 \
+    --epochs 3 \
+    --lr 2e-5 \
     --batch-size 1 \
     --grad-accum 8 \
-    --max-length 3072 \
+    --max-length 2048 \
     --lora-r 16
 
 echo ""
