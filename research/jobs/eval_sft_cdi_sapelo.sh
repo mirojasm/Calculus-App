@@ -20,6 +20,8 @@ source ~/.bashrc 2>/dev/null || true
 source .venv/bin/activate
 export PYTHONPATH=$VIRTUAL_ENV/lib/python3.11/site-packages
 
+pip install --require-virtualenv --quiet openai peft accelerate
+
 MODEL_PATH="/scratch/$USER/llm/models/hf/Mistral-7B-Instruct-v0.3"
 ADAPTER_PATH="outputs/training/split_adapter/final_adapter"
 
