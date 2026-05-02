@@ -152,8 +152,11 @@ def evaluate(
     n_samples:      int  = 1,
     max_new_tokens: int  = 512,
     show:           int  = 5,
+    output_prefix:  str  = "split_eval",
 ) -> None:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
+    out_results = OUT_DIR / f"{output_prefix}.jsonl"
+    out_summary = OUT_DIR / f"{output_prefix}_summary.json"
 
     # Load test problems (extract system + user from "chosen" messages)
     test_records = []
@@ -213,7 +216,7 @@ def evaluate(
         print(f"  [{i+1:>3}/{len(test_records)}] {status}  {rec['problem'][:60]}")
 
     # Write per-problem results
-    with open(OUT_RESULTS, "w", encoding="utf-8") as f:
+    with open(out_results, "w", encoding="utf-8") as f:
         for r in results:
             f.write(json.dumps(r, ensure_ascii=False) + "\n")
 
@@ -249,7 +252,7 @@ def evaluate(
             for r in results[:show]
         ],
     }
-    OUT_SUMMARY.write_text(json.dumps(summary, indent=2, ensure_ascii=False))
+    out_summary.write_text(json.dumps(summary, indent=2, ensure_ascii=False))
 
     # Print summary
     print(f"""
@@ -265,8 +268,8 @@ fully_valid_rate   : {summary['fully_valid_rate']:.1%}  ({len(fully_valid)}/{n})
 Pattern distribution:
 {json.dumps(pattern_dist, indent=2)}
 
-Results → {OUT_RESULTS}
-Summary → {OUT_SUMMARY}
+Results → {out_results}
+Summary → {out_summary}
 """)
 
 
@@ -279,6 +282,8 @@ def main() -> None:
     parser.add_argument("--max-new-tokens", type=int, default=512)
     parser.add_argument("--show",           type=int, default=5,
                         help="number of sample outputs to include in summary")
+    parser.add_argument("--output-prefix",  default="split_eval",
+                        help="prefix for output files (e.g. 'ablation_100')")
     args = parser.parse_args()
     evaluate(
         base_model=args.base_model,
@@ -286,6 +291,7 @@ def main() -> None:
         n_samples=args.n_samples,
         max_new_tokens=args.max_new_tokens,
         show=args.show,
+        output_prefix=args.output_prefix,
     )
 
 

@@ -44,7 +44,7 @@ fi
 python3 -m research.experiments.eval_sft_cdi \
     --base-model "$MODEL_PATH" \
     --adapter-path "$ADAPTER_PATH" \
-    --n-problems 20 \
+    --n-problems 50 \
     --n-samples 3
 
 echo ""

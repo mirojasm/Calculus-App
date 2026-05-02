@@ -22,7 +22,7 @@ OUTPUT_DIR   = Path("outputs/training/split_adapter")
 DEFAULT_BASE = "meta-llama/Llama-3.1-8B-Instruct"
 
 
-def _load_sft_dataset(path: Path, tokenizer):
+def _load_sft_dataset(path: Path, tokenizer, max_examples: int | None = None):
     from datasets import Dataset
     records = []
     with open(path, encoding="utf-8") as f:
@@ -33,6 +33,8 @@ def _load_sft_dataset(path: Path, tokenizer):
                 chosen_msgs, tokenize=False, add_generation_prompt=False
             )
             records.append({"text": text})
+    if max_examples is not None:
+        records = records[:max_examples]
     return Dataset.from_list(records)
 
 
@@ -46,6 +48,8 @@ def train(
     lora_r:        int   = 16,
     lora_alpha:    int   = 32,
     lora_dropout:  float = 0.05,
+    max_examples:  int | None = None,
+    output_dir:    Path  = OUTPUT_DIR,
 ) -> None:
     import torch
     from transformers import AutoTokenizer, AutoModelForCausalLM
@@ -55,7 +59,8 @@ def train(
     if not TRAIN_JSONL.exists():
         raise FileNotFoundError(f"{TRAIN_JSONL} not found.")
 
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"[INFO] Base model    : {base_model}")
     print(f"[INFO] Method        : SFT (chosen splits only, no reference model)")
@@ -64,6 +69,7 @@ def train(
     print(f"[INFO] Batch×Accum   : {batch_size}×{grad_accum} = {batch_size * grad_accum} eff.")
     print(f"[INFO] LoRA r / alpha: {lora_r} / {lora_alpha}")
     print(f"[INFO] Max length    : {max_length}")
+    print(f"[INFO] Max examples  : {max_examples if max_examples else 'all'}")
     print(f"[INFO] Precision     : float16 (no quantization — fits A100-40GB)")
 
     tokenizer = AutoTokenizer.from_pretrained(base_model, trust_remote_code=True)
@@ -88,14 +94,14 @@ def train(
                         "gate_proj", "up_proj", "down_proj"],
     )
 
-    train_ds = _load_sft_dataset(TRAIN_JSONL, tokenizer)
+    train_ds = _load_sft_dataset(TRAIN_JSONL, tokenizer, max_examples=max_examples)
     test_ds  = _load_sft_dataset(TEST_JSONL, tokenizer) if TEST_JSONL.exists() else None
     print(f"[INFO] Train examples: {len(train_ds)}")
     if test_ds:
         print(f"[INFO] Test  examples: {len(test_ds)}")
 
     sft_config = SFTConfig(
-        output_dir=str(OUTPUT_DIR),
+        output_dir=str(output_dir),
         num_train_epochs=epochs,
         per_device_train_batch_size=batch_size,
         per_device_eval_batch_size=batch_size,
@@ -126,24 +132,25 @@ def train(
     print("[INFO] Starting SFT training (split generator)...")
     trainer.train()
 
-    adapter_path = OUTPUT_DIR / "final_adapter"
+    adapter_path = output_dir / "final_adapter"
     trainer.model.save_pretrained(str(adapter_path))
     tokenizer.save_pretrained(str(adapter_path))
     print(f"[INFO] Adapter saved → {adapter_path}")
 
     meta = {
-        "base_model":  base_model,
-        "method":      "SFT",
-        "task":        "split_generator",
-        "precision":   "float16",
-        "epochs":      epochs,
-        "lr":          lr,
-        "lora_r":      lora_r,
-        "lora_alpha":  lora_alpha,
-        "train_size":  len(train_ds),
-        "test_size":   len(test_ds) if test_ds else 0,
+        "base_model":   base_model,
+        "method":       "SFT",
+        "task":         "split_generator",
+        "precision":    "float16",
+        "epochs":       epochs,
+        "lr":           lr,
+        "lora_r":       lora_r,
+        "lora_alpha":   lora_alpha,
+        "train_size":   len(train_ds),
+        "test_size":    len(test_ds) if test_ds else 0,
+        "max_examples": max_examples,
     }
-    (OUTPUT_DIR / "train_meta.json").write_text(json.dumps(meta, indent=2))
+    (output_dir / "train_meta.json").write_text(json.dumps(meta, indent=2))
     print("[INFO] Split generator SFT fine-tuning complete.")
 
 
@@ -155,7 +162,11 @@ def main() -> None:
     parser.add_argument("--batch-size",  type=int,   default=1)
     parser.add_argument("--grad-accum",  type=int,   default=8)
     parser.add_argument("--max-length",  type=int,   default=2048)
-    parser.add_argument("--lora-r",      type=int,   default=16)
+    parser.add_argument("--lora-r",        type=int,   default=16)
+    parser.add_argument("--max-examples",  type=int,   default=None,
+                        help="Subsample training set for ablation study")
+    parser.add_argument("--output-dir",    default=str(OUTPUT_DIR),
+                        help="Directory to save adapter (for ablation runs)")
     args = parser.parse_args()
     train(
         base_model=args.base_model,
@@ -166,6 +177,8 @@ def main() -> None:
         max_length=args.max_length,
         lora_r=args.lora_r,
         lora_alpha=args.lora_r * 2,
+        max_examples=args.max_examples,
+        output_dir=Path(args.output_dir),
     )
 
 
