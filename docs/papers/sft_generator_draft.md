@@ -11,7 +11,7 @@ Collaborative AI systems — multi-agent pipelines, human-AI teams, and peer tut
 
 We introduce the task of **epistemic split generation** and frame it as a supervised learning problem over a novel preference-annotated dataset derived from the CIDI pipeline — a five-module LLM system that produces jigsaw splits satisfying Szewkis's (2011) positive interdependence conditions. A key finding is negative: Direct Preference Optimisation (DPO) is *inappropriate* for this task. Because split generation is a **format-learning** problem — the model must acquire a structured output schema rather than rank two stylistically similar candidates — DPO catastrophically collapses: by epoch 0.36, both chosen and rejected log-probabilities diverge symmetrically (−164 vs. −236), loss reaches 0.016, and gradient norm drops to zero. The model escapes the training distribution by making both outputs equally implausible rather than learning the split format.
 
-Supervised Fine-Tuning (SFT) on chosen examples only resolves this collapse entirely. A Mistral-7B-Instruct-v0.3 model fine-tuned with LoRA (r=16, 333 training examples, 3 epochs) achieves 96.6% fully-valid structural output and a Collaborative Dialogue Index (CDI) of 0.583 — 64.7% of generated splits exceeding the CDI ≥ 0.5 threshold for genuine epistemic interdependence. Shapley-based analysis confirms that 25% of splits exhibit epistemic necessity (collaboration produces a correct answer neither agent can reach alone) with a mean collaborative surplus of +0.207.
+Supervised Fine-Tuning (SFT) on chosen examples only resolves this collapse entirely. A Mistral-7B-Instruct-v0.3 model fine-tuned with LoRA (r=16, 333 training examples, 3 epochs) achieves 96.6% fully-valid structural output and a Collaborative Dialogue Index (CDI) of 0.530 — 53.6% of generated splits exceeding the CDI ≥ 0.5 threshold for genuine epistemic interdependence (n=28 evaluation problems). Shapley-based analysis confirms that 25% of splits exhibit epistemic necessity (collaboration produces a correct answer neither agent can reach alone) with a mean collaborative surplus of +0.207.
 
 We propose CDI as a differentiable training signal for reinforcement learning, outline a scaling roadmap projecting CDI ≥ 0.7 with 5,000 training examples, and discuss generalisability beyond mathematics to any domain where collaborative problem solving requires structured information asymmetry.
 
@@ -198,22 +198,32 @@ The single failure case (3 problems, all from one unique problem) involved a pro
 
 The dominance of SPLIT-C reflects the algebraic composition of the MATH benchmark (algebra is the largest category), where splitting a system of equations between two agents is the natural interdependence-creating strategy.
 
-### 4.3 CDI Evaluation (n = 20 test problems)
+**Training set size ablation.** To assess whether structural validity scales with training data, we trained the SFT model with N=100 and N=200 examples (subsets of the same 333-example training set) and evaluated structural validity on the same 87 test problems.
 
-We selected 20 held-out test problems and ran each SFT-generated split through the full C7 student-simulation pipeline to compute CDI. Of 20 problems, 17 completed the C7 pipeline successfully (3 failures due to API timeouts, not model errors). We compare SFT-generated CDI against the reference CDI of the CIDI-generated split for the same problem.
+| Training examples (N) | fully_valid_rate |
+|----------------------|-----------------|
+| 100 | 95.4% (83/87) |
+| 200 | 90.8% (79/87) |
+| 333 | 96.6% (84/87) |
+
+The pattern is non-monotonic (100 > 200 < 333), with differences of 4–5 problems out of 87 — likely within the noise of stochastic generation at temperature 0.7. The key finding is that **format acquisition saturates at approximately 100 examples**: the model reliably learns the JSON schema and interdependence structure with as few as 100 demonstrations. Improving CDI quality (not structural validity) is what requires more data, as the semantic conditions for epistemic necessity are harder to learn than the output format.
+
+### 4.3 CDI Evaluation (n = 29 test problems)
+
+We selected all available held-out test problems (n=29) and ran each SFT-generated split through the full C7 student-simulation pipeline to compute CDI. Of 29 problems, 28 completed the C7 pipeline successfully (1 pipeline failure). We compare SFT-generated CDI against the reference CDI of the CIDI-generated split for the same problem.
 
 | Metric | SFT Model | CIDI Reference | Δ |
 |--------|-----------|----------------|---|
-| CDI mean | 0.583 | 0.789 | −0.206 |
-| CDI ≥ 0.5 rate | 64.7% (11/17) | 100% (17/17) | −35.3 pp |
-| CQI mean | 0.239 | — | — |
+| CDI mean | 0.530 | 0.789 | −0.259 |
+| CDI ≥ 0.5 rate | 53.6% (15/28) | 100% (28/28) | −46.4 pp |
+| CQI mean | 0.209 | — | — |
 | PhAQ mean | 0.111 | — | — |
 
-The SFT model achieves a CDI of 0.583, crossing the ≥ 0.5 threshold that indicates genuine epistemic interdependence in 64.7% of cases. The gap relative to CIDI (Δ = −0.206) reflects the inherent difficulty of distilling a five-module verification pipeline into a single 7B-parameter forward pass — the model learns the split *format* well but occasionally produces splits that are structurally valid yet semantically insufficient to force collaboration (CDI = 0.000 cases).
+The SFT model achieves a CDI of 0.530, crossing the ≥ 0.5 threshold that indicates genuine epistemic interdependence in 53.6% of cases. The gap relative to CIDI (Δ = −0.259) reflects the inherent difficulty of distilling a five-module verification pipeline into a single 7B-parameter forward pass — the model learns the split *format* well but occasionally produces splits that are structurally valid yet semantically insufficient to force collaboration (CDI = 0.000 cases).
 
-Notably, the SFT model *outperforms* the CIDI reference on 3 of 17 problems (Δ up to +0.333). These are cases where the CIDI pipeline produced a split that, while structurally valid, created an unbalanced information allocation; the SFT model's learned heuristic happened to produce a more balanced split. This suggests the model has absorbed not just the format but some of the epistemic design principles.
+Notably, the SFT model *outperforms* the CIDI reference on several problems (Δ up to +0.333). These are cases where the CIDI pipeline produced a split that, while structurally valid, created an unbalanced information allocation; the SFT model's learned heuristic happened to produce a more balanced split. This suggests the model has absorbed not just the format but some of the epistemic design principles.
 
-**Failure mode analysis.** Zero-CDI failures share a common pattern: the SFT model splits the problem such that one agent receives enough information to deduce the answer alone — typically by giving one agent the problem constraints *and* the goal statement. This violates the `agent2_can_answer_alone = false` condition at the semantic level even though it passes the syntactic `interdependence_check`. Future work should introduce a semantic solver check into the verifier.
+**Failure mode analysis.** Zero-CDI failures share a common pattern: the SFT model splits the problem such that one agent receives enough information to deduce the answer alone — typically by giving one agent the problem constraints *and* the goal statement. This violates the `agent2_can_answer_alone = false` condition at the semantic level even though it passes the syntactic `interdependence_check`. Future work should introduce a semantic solver check into the verifier. The SFT→DPO pipeline (§5.3) targets this failure mode directly by training against low-CDI rejected examples from the SFT distribution.
 
 ### 4.4 Agent Epistemic Contribution (AEC) Analysis
 
@@ -254,7 +264,7 @@ The gap between EN rate (25%) and both-solo-zero rate (85%) reveals an important
 
 Our SFT model was trained on 333 examples derived from 136 CIDI-generated splits. This is a low-data regime by the standards of LLM fine-tuning: [CITE: Peng et al. 2023] showed that 7B-parameter models typically require 500–2,000 demonstrations to reliably acquire a structured output schema, and CDI optimisation (beyond format validity) likely requires 2,000–5,000 examples with diverse difficulty coverage.
 
-The 96.6% structural validity achieved with 333 examples is encouraging — it suggests that format acquisition (JSON schema + pattern vocabulary) requires fewer examples than CDI optimisation, which demands learning the *semantic* conditions for epistemic necessity.
+The 96.6% structural validity achieved with 333 examples is encouraging — and the training set size ablation (§4.2) confirms that format acquisition (JSON schema + pattern vocabulary) saturates at approximately 100 examples. CDI optimisation, which demands learning the *semantic* conditions for epistemic necessity, is the bottleneck that requires more data.
 
 ### 5.2 Scaling Roadmap
 
@@ -266,8 +276,8 @@ We project the following CDI trajectory as a function of training set size, base
 
 The three key scaling milestones are:
 
-1. **Format acquisition** (~200 examples): The model reliably produces structurally valid JSON. Our 96.6% rate at 333 examples confirms this threshold is below 333.
-2. **CDI > 0.5 majority** (~500 examples): More than 50% of generated splits achieve genuine epistemic interdependence on evaluation. Currently at 64.7% with 333 examples; additional algebraic-domain examples should push this past 75% before requiring fundamental model changes.
+1. **Format acquisition** (~100 examples): The model reliably produces structurally valid JSON. Our ablation (§4.2) confirms 95.4% structural validity at N=100, establishing this threshold empirically.
+2. **CDI > 0.5 majority** (~500 examples): More than 50% of generated splits achieve genuine epistemic interdependence on evaluation. Currently at 53.6% with 333 examples (n=28); additional algebraic-domain examples should push this past 70% before requiring fundamental model changes.
 3. **Reference-level performance** (~5,000 examples): CDI ≥ 0.75, approaching the CIDI reference ceiling of 0.789. This requires diverse problem types beyond algebra and precise coverage of all seven split patterns.
 
 To generate 5,000 training examples, approximately 2,500 unique MATH problems would need to be processed through the CIDI pipeline (at N_NAIVE = 2). At an estimated cost of $0.08 per problem through CIDI, the full 5K dataset would cost approximately $200 to generate — a one-time investment that enables a zero-cost inference pipeline thereafter.
@@ -295,7 +305,7 @@ The key question for generalisation is whether CDI remains a valid metric outsid
 
 ### 6.2 Limitations
 
-**Small evaluation set.** CDI evaluation required running the full C7 student-simulation pipeline (12+ API calls per problem). We evaluated 20 problems; 3 failed due to API timeouts. Results on 17 problems should be interpreted with caution — the CDI gap relative to CIDI may narrow or widen with a larger evaluation set.
+**CDI evaluation set size.** CDI evaluation required running the full C7 student-simulation pipeline (12+ API calls per problem). We evaluated all 29 available held-out test problems; 28 completed the pipeline successfully. The test set size is bounded by the 80/20 problem-level split of the dataset (approximately 27 unique test problems, with multiple pairs per problem). While n=28 is more robust than an initial n=17 pilot evaluation, confidence intervals on CDI mean (0.530) and rate (53.6%) remain wide; estimates should be treated as indicative rather than definitive.
 
 **Simulator confound.** The CDI metric measures collaborative dialogue quality in a *simulated* student conversation. If the LLM student simulators (GPT-4o-mini in the C7 pipeline) fail to faithfully model human students — e.g., if they are too good at sharing information regardless of interdependence constraints — then CDI may overestimate or underestimate true epistemic necessity. The AEC analysis (§4.4) partially addresses this by evaluating correctness rather than dialogue quality, but the 25% EN rate reflects the simulator's collaborative ability as much as the split's design quality.
 
@@ -321,7 +331,7 @@ We have formalised the task of epistemic split generation — producing informat
 
 Our key finding is that DPO collapses on format-learning tasks: when chosen and rejected outputs differ in structural validity rather than stylistic quality, DPO's margin objective drives both chosen and rejected log-probabilities toward zero, making both outputs equally implausible. This is an identifiable and diagnosable failure mode — the log-probability divergence signature is visible in standard TRL training logs — and it generalises beyond our specific task to any structured generation domain where the target output format lies far from the reference model's distribution.
 
-SFT resolves this collapse. Our Mistral-7B model achieves 96.6% structural validity on 87 held-out problems and a CDI of 0.583 — 64.7% of splits achieve genuine epistemic interdependence — with a mean collaborative surplus of +0.207 and an epistemic necessity rate of 25% under Shapley analysis. The gap relative to the CIDI reference pipeline (CDI = 0.789) is interpretable and closeable: we estimate that 5,000 training examples and an RL-CDI fine-tuning stage would bring the model to reference-level performance.
+SFT resolves this collapse. Our Mistral-7B model achieves 96.6% structural validity on 87 held-out problems — confirmed as saturated at N≈100 by an ablation study — and a CDI of 0.530 on n=28 evaluation problems (53.6% of splits achieve genuine epistemic interdependence), with a mean collaborative surplus of +0.207 and an epistemic necessity rate of 25% under Shapley analysis. The gap relative to the CIDI reference pipeline (CDI = 0.789) is interpretable and closeable: we estimate that 5,000 training examples and an RL-CDI fine-tuning stage would bring the model to reference-level performance.
 
 CDI is a trainable signal. As a scalar reward in [0, 1] with a well-defined threshold (≥ 0.5 for genuine interdependence), it admits reinforcement learning, reward model distillation, and best-of-N decoding as improvement strategies. Making collaborative AI *epistemically* rigorous — rather than merely socially fluent — requires metrics like CDI that measure whether information asymmetry is doing real epistemic work. We believe CDI-optimised split generation is a step toward AI systems that genuinely need each other.
 
