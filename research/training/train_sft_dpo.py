@@ -105,15 +105,8 @@ def train(
     merged.config.use_cache = False
     print("[INFO] SFT adapter merged into base weights.")
 
-    # ── Step 2: reference model = frozen copy of merged ──────────────────────
-    print("[INFO] Creating frozen reference model (copy of merged SFT)...")
-    ref_model = copy.deepcopy(merged)
-    for p in ref_model.parameters():
-        p.requires_grad_(False)
-
-    # Move both to CUDA
-    merged    = merged.cuda()
-    ref_model = ref_model.cuda()
+    # Move to CUDA
+    merged = merged.cuda()
 
     # ── Step 3: apply new LoRA on top of merged model ────────────────────────
     lora_config = LoraConfig(
@@ -153,9 +146,12 @@ def train(
         remove_unused_columns=False,
     )
 
+    # ref_model=None: TRL uses the adapter-disabled model as reference,
+    # which equals the merged SFT weights — exactly what we want.
+    # Passing both ref_model and peft_config raises ValueError in TRL 0.11.4.
     trainer = DPOTrainer(
         model=merged,
-        ref_model=ref_model,
+        ref_model=None,
         args=dpo_config,
         train_dataset=train_ds,
         eval_dataset=test_ds,
