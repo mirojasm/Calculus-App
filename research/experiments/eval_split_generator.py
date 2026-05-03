@@ -96,7 +96,7 @@ def _validate(d: dict) -> dict:
 
 # ── generation ────────────────────────────────────────────────────────────────
 
-def _load_model(base_model: str, adapter_path: Path):
+def _load_model(base_model: str, adapter_path: Path, sft_adapter_path: Path | None = None):
     import torch
     from transformers import AutoTokenizer, AutoModelForCausalLM
     from peft import PeftModel
@@ -110,6 +110,15 @@ def _load_model(base_model: str, adapter_path: Path):
     model = AutoModelForCausalLM.from_pretrained(
         base_model, torch_dtype=torch.float16, trust_remote_code=True
     ).cuda()
+
+    # For SFT→DPO adapters: first merge the SFT adapter into the base model,
+    # then load the DPO adapter on top of the merged weights.
+    if sft_adapter_path is not None:
+        print(f"[INFO] Merging SFT adapter: {sft_adapter_path}")
+        model = PeftModel.from_pretrained(model, str(sft_adapter_path))
+        model = model.merge_and_unload()
+        print(f"[INFO] SFT adapter merged.")
+
     model = PeftModel.from_pretrained(model, str(adapter_path))
     model.eval()
     print(f"[INFO] Adapter loaded from: {adapter_path}")
@@ -147,12 +156,13 @@ def _generate_split(model, tokenizer, system: str, problem: str,
 # ── main evaluation ───────────────────────────────────────────────────────────
 
 def evaluate(
-    base_model:     str  = DEFAULT_BASE,
-    adapter_path:   Path = ADAPTER_PATH,
-    n_samples:      int  = 1,
-    max_new_tokens: int  = 512,
-    show:           int  = 5,
-    output_prefix:  str  = "split_eval",
+    base_model:       str       = DEFAULT_BASE,
+    adapter_path:     Path      = ADAPTER_PATH,
+    sft_adapter_path: Path|None = None,
+    n_samples:        int       = 1,
+    max_new_tokens:   int       = 512,
+    show:             int       = 5,
+    output_prefix:    str       = "split_eval",
 ) -> None:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     out_results = OUT_DIR / f"{output_prefix}.jsonl"
@@ -174,7 +184,7 @@ def evaluate(
     print(f"[INFO] Samples/problem: {n_samples}")
     print(f"[INFO] Max new tokens : {max_new_tokens}")
 
-    model, tokenizer = _load_model(base_model, adapter_path)
+    model, tokenizer = _load_model(base_model, adapter_path, sft_adapter_path)
 
     results = []
     for i, rec in enumerate(test_records):
@@ -282,12 +292,16 @@ def main() -> None:
     parser.add_argument("--max-new-tokens", type=int, default=512)
     parser.add_argument("--show",           type=int, default=5,
                         help="number of sample outputs to include in summary")
-    parser.add_argument("--output-prefix",  default="split_eval",
+    parser.add_argument("--output-prefix",    default="split_eval",
                         help="prefix for output files (e.g. 'ablation_100')")
+    parser.add_argument("--sft-adapter-path", default=None,
+                        help="SFT adapter to merge before loading the main adapter "
+                             "(required for SFT→DPO adapters)")
     args = parser.parse_args()
     evaluate(
         base_model=args.base_model,
         adapter_path=Path(args.adapter_path),
+        sft_adapter_path=Path(args.sft_adapter_path) if args.sft_adapter_path else None,
         n_samples=args.n_samples,
         max_new_tokens=args.max_new_tokens,
         show=args.show,

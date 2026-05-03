@@ -166,8 +166,11 @@ def train(
     print("[INFO] Starting SFT→DPO training...")
     trainer.train()
 
+    # trainer.save_model() handles PEFT correctly in TRL; avoid trainer.model.save_pretrained()
+    # which can silently fail when model passed through merge_and_unload() + new LoRA.
     adapter_path = Path(output_dir) / "final_adapter"
-    trainer.model.save_pretrained(str(adapter_path))
+    adapter_path.mkdir(parents=True, exist_ok=True)
+    trainer.save_model(str(adapter_path))
     tokenizer.save_pretrained(str(adapter_path))
     print(f"[INFO] DPO adapter saved → {adapter_path}")
 

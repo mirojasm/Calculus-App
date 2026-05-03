@@ -55,11 +55,12 @@ echo ""
 echo "=== Training done — running structural eval on DPO adapter ==="
 
 python3 -m research.experiments.eval_split_generator \
-    --base-model    "$MODEL_PATH" \
-    --adapter-path  "${OUTPUT_DIR}/final_adapter" \
-    --n-samples     3 \
-    --max-new-tokens 512 \
-    --output-prefix "sft_dpo_eval"
+    --base-model       "$MODEL_PATH" \
+    --sft-adapter-path "$SFT_ADAPTER" \
+    --adapter-path     "${OUTPUT_DIR}/final_adapter" \
+    --n-samples        3 \
+    --max-new-tokens   512 \
+    --output-prefix    "sft_dpo_eval"
 
 echo ""
 echo "=== DONE ==="
