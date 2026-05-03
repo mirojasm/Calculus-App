@@ -26,8 +26,6 @@ from pathlib import Path
 PAIRS_FULL   = Path("outputs/training/split_dpo_pairs_full.jsonl")
 ADAPTER_PATH = Path("outputs/training/split_adapter/final_adapter")
 OUT_DIR      = Path("outputs/eval")
-OUT_RESULTS  = OUT_DIR / "sft_cdi_results.jsonl"
-OUT_SUMMARY  = OUT_DIR / "sft_cdi_summary.json"
 
 DEFAULT_BASE = "/scratch/mir85108/llm/models/hf/Mistral-7B-Instruct-v0.3"
 TRAIN_FRAC   = 0.8
@@ -132,7 +130,7 @@ def _build_split_result(problem_id: str, problem: str, split_json: dict):
 
 # ── SFT generation ────────────────────────────────────────────────────────────
 
-def _load_model(base_model: str, adapter_path: Path):
+def _load_model(base_model: str, adapter_path: Path, sft_adapter_path: Path | None = None):
     import torch
     from transformers import AutoTokenizer, AutoModelForCausalLM
     from peft import PeftModel
@@ -146,6 +144,13 @@ def _load_model(base_model: str, adapter_path: Path):
     model = AutoModelForCausalLM.from_pretrained(
         base_model, torch_dtype=__import__("torch").float16, trust_remote_code=True
     ).cuda()
+
+    if sft_adapter_path is not None:
+        print(f"[INFO] Merging SFT adapter: {sft_adapter_path}")
+        model = PeftModel.from_pretrained(model, str(sft_adapter_path))
+        model = model.merge_and_unload()
+        print(f"[INFO] SFT adapter merged.")
+
     model = PeftModel.from_pretrained(model, str(adapter_path))
     model.eval()
     print(f"[INFO] Adapter loaded from: {adapter_path}")
@@ -201,12 +206,16 @@ def _run_c7_with_split(split_result) -> dict:
 # ── main ──────────────────────────────────────────────────────────────────────
 
 def evaluate(
-    base_model:  str  = DEFAULT_BASE,
-    adapter_path: Path = ADAPTER_PATH,
-    n_problems:  int  = 20,
-    n_samples:   int  = 3,
+    base_model:       str       = DEFAULT_BASE,
+    adapter_path:     Path      = ADAPTER_PATH,
+    sft_adapter_path: Path|None = None,
+    n_problems:       int       = 20,
+    n_samples:        int       = 3,
+    output_prefix:    str       = "sft_cdi",
 ) -> None:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
+    OUT_RESULTS = OUT_DIR / f"{output_prefix}_results.jsonl"
+    OUT_SUMMARY = OUT_DIR / f"{output_prefix}_summary.json"
 
     # Load all pairs and pick unique test-set problem IDs
     all_pairs: list[dict] = []
@@ -237,7 +246,7 @@ def evaluate(
     print(f"[INFO] Evaluating              : {len(eval_pids)}")
     print(f"[INFO] SFT samples/problem     : {n_samples}")
 
-    model, tokenizer = _load_model(base_model, adapter_path)
+    model, tokenizer = _load_model(base_model, adapter_path, sft_adapter_path)
 
     results = []
     for i, pid in enumerate(eval_pids):
@@ -339,17 +348,24 @@ Summary → {OUT_SUMMARY}
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--base-model",   default=DEFAULT_BASE)
-    parser.add_argument("--adapter-path", default=str(ADAPTER_PATH))
-    parser.add_argument("--n-problems",   type=int, default=20)
-    parser.add_argument("--n-samples",    type=int, default=3,
-                        help="SFT samples per problem for sample-then-filter")
+    parser.add_argument("--base-model",      default=DEFAULT_BASE)
+    parser.add_argument("--adapter-path",    default=str(ADAPTER_PATH))
+    parser.add_argument("--sft-adapter-path", default=None,
+                        help="SFT adapter to merge before loading the main adapter "
+                             "(required for SFT→DPO adapters)")
+    parser.add_argument("--n-problems",      type=int, default=20)
+    parser.add_argument("--n-samples",       type=int, default=3,
+                        help="samples per problem for sample-then-filter")
+    parser.add_argument("--output-prefix",   default="sft_cdi",
+                        help="prefix for output files (e.g. 'dpo_cdi')")
     args = parser.parse_args()
     evaluate(
         base_model=args.base_model,
         adapter_path=Path(args.adapter_path),
+        sft_adapter_path=Path(args.sft_adapter_path) if args.sft_adapter_path else None,
         n_problems=args.n_problems,
         n_samples=args.n_samples,
+        output_prefix=args.output_prefix,
     )
 
 
