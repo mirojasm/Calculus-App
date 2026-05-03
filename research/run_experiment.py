@@ -78,12 +78,19 @@ def stage_load() -> List[dict]:
 
 # ── stage 2: split ────────────────────────────────────────────────────────────
 
+_SPLITTER = "cidi"   # overridden by --splitter CLI arg
+
+
 def _split_one(prob: dict, n: int) -> dict:
     out_path = SPLITS_DIR / f"{prob['id']}_n{n}.json"
     if out_path.exists():
         return _load_json(out_path)
 
-    result = split(prob["id"], prob["problem"], n)
+    if _SPLITTER == "sft":
+        from research.splitting.sft_splitter import generate_split
+        result = generate_split(prob["id"], prob["problem"])
+    else:
+        result = split(prob["id"], prob["problem"], n)
     data = {
         "problem_id": result.problem_id,
         "n": result.n,
@@ -393,11 +400,15 @@ def stage_analyse() -> None:
 # ── CLI ───────────────────────────────────────────────────────────────────────
 
 def main():
+    global _SPLITTER
     parser = argparse.ArgumentParser()
-    parser.add_argument("--stage",   default="all",
+    parser.add_argument("--stage",    default="all",
                         choices=["load", "split", "simulate", "score", "analyse", "all"])
-    parser.add_argument("--workers", type=int, default=8)
+    parser.add_argument("--workers",  type=int, default=8)
+    parser.add_argument("--splitter", default="cidi", choices=["cidi", "sft"],
+                        help="Split generator: 'cidi' (GPT-4/Groq, default) or 'sft' (local model, free)")
     args = parser.parse_args()
+    _SPLITTER = args.splitter
 
     t0 = time.time()
 
