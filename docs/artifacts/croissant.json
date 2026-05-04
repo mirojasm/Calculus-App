@@ -1,0 +1,204 @@
+{
+  "@context": {
+    "@language": "en",
+    "@vocab": "https://schema.org/",
+    "cr": "http://mlcommons.org/croissant/",
+    "dct": "http://purl.org/dc/terms/",
+    "rai": "http://mlcommons.org/croissant/RAI/",
+    "sc": "https://schema.org/"
+  },
+  "@type": "sc:Dataset",
+  "name": "CIDI-140",
+  "alternateName": "Collaborative Interdependence-Directed Information Benchmark",
+  "description": "CIDI-140 is a benchmark of 140 MATH problems equipped with Collaborative Interdependence-Directed Information (CIDI) splits for studying epistemic role framing in LLM multi-agent collaboration. Each problem is decomposed into (shared context, Packet A, Packet B) such that neither agent can progress without the other's deductions. The dataset includes 2,112 conversation transcripts across three framing conditions (C2: natural, C6: peer-aware, C7: active-learner) and 832 ablation transcripts (CFULL: learner framing without split, CEXP: expert framing with split), annotated with CPP (Collaborative Phase Profile) metrics (CDI, CQI, PhAQ) and Agent Epistemic Contribution (AEC) Shapley decomposition.",
+  "url": "[anonymous repository — redacted for review]",
+  "license": "https://creativecommons.org/licenses/by/4.0/",
+  "version": "1.0.0",
+  "datePublished": "2026-05-04",
+  "inLanguage": "en",
+  "keywords": [
+    "multi-agent LLM",
+    "collaborative problem solving",
+    "epistemic framing",
+    "MATH benchmark",
+    "information split",
+    "collaborative discourse",
+    "NeurIPS 2026"
+  ],
+  "creator": {
+    "@type": "sc:Person",
+    "name": "[Anonymous — redacted for review]"
+  },
+  "citation": "[Anonymous] (2026). Epistemic Role Framing Elicits Deep Collaboration in LLM Multi-Agent Systems. NeurIPS 2026 Evaluations & Datasets Track. [Anonymous submission]",
+  "isAccessibleForFree": true,
+  "rai:dataCollection": "Conversations generated via GPT-4.1 API under three framing conditions. Problems sourced from MATH benchmark (Hendrycks et al., 2021). Original MATH problem text not redistributed per MATH license; only MATH IDs and derived CIDI splits are included in the corpus file.",
+  "rai:dataBiases": "The 140-problem corpus was filtered using C7 performance (CDI >= 0.5 in >= 2/3 replications). All estimates are conditional on CIDI-amenable problems. Effect sizes may overestimate framing benefits on unfiltered MATH samples. See benchmark_card.md for full conditionality statement.",
+  "rai:annotationsProtocol": "CPP rubric annotation by two trained graduate-student annotators, blinded to condition assignment (label masking; randomised presentation order). Disagreements >1 scale point resolved by consensus with a third annotator. Inter-rater reliability: Krippendorff alpha=0.81 (ordinal, n=36), ICC(2,1)=0.83 for CQI, Cohen kappa=0.76 for CDI binary.",
+  "distribution": [
+    {
+      "@type": "cr:FileObject",
+      "@id": "corpus-file",
+      "name": "phase2_problems.json",
+      "description": "140 MATH problem records with CIDI splits (shared context, Packet A, Packet B). Problem text stripped per MATH license; MATH IDs and derived splits included.",
+      "contentUrl": "corpus/phase2_problems.json",
+      "encodingFormat": "application/json",
+      "sha256": "see release"
+    },
+    {
+      "@type": "cr:FileSet",
+      "@id": "transcripts-C2",
+      "name": "transcripts/C2",
+      "description": "Conversation transcripts for condition C2 (natural baseline, no framing). 709 files for 140 problems (3-7 replications each).",
+      "containedIn": {"@id": "transcripts-C2"},
+      "encodingFormat": "application/json",
+      "includes": "transcripts/C2/*.json"
+    },
+    {
+      "@type": "cr:FileSet",
+      "@id": "transcripts-C6",
+      "name": "transcripts/C6",
+      "description": "Conversation transcripts for condition C6 (peer-aware framing). 702 files for 140 problems.",
+      "encodingFormat": "application/json",
+      "includes": "transcripts/C6/*.json"
+    },
+    {
+      "@type": "cr:FileSet",
+      "@id": "transcripts-C7",
+      "name": "transcripts/C7",
+      "description": "Conversation transcripts for condition C7 (active-learner framing). 701 files for 140 problems.",
+      "encodingFormat": "application/json",
+      "includes": "transcripts/C7/*.json"
+    },
+    {
+      "@type": "cr:FileSet",
+      "@id": "ablations-CFULL",
+      "name": "ablations/CFULL",
+      "description": "Ablation condition CFULL: C7 active-learner framing with full problem context (no CIDI split). 412 files (8 of 420 planned excluded due to content-policy refusals).",
+      "encodingFormat": "application/json",
+      "includes": "ablations/CFULL/*.json"
+    },
+    {
+      "@type": "cr:FileSet",
+      "@id": "ablations-CEXP",
+      "name": "ablations/CEXP",
+      "description": "Ablation condition CEXP: CIDI split with expert-solver framing (no active-learner stance). 420 files.",
+      "encodingFormat": "application/json",
+      "includes": "ablations/CEXP/*.json"
+    },
+    {
+      "@type": "cr:FileObject",
+      "@id": "ablations-summary",
+      "name": "ablations_summary.json",
+      "description": "Aggregate statistics for CFULL and CEXP ablation conditions: mean CDI, CQI, PhAQ, SE, and quadrant percentages.",
+      "contentUrl": "ablations/ablations_summary.json",
+      "encodingFormat": "application/json"
+    },
+    {
+      "@type": "cr:FileObject",
+      "@id": "aec-results",
+      "name": "aec_results.jsonl",
+      "description": "Per-problem AEC (Agent Epistemic Contribution) solo-run correctness results. One JSON record per line, fields: problem_id, v_A, v_B, v_AB, en, cs, eb.",
+      "contentUrl": "aec/aec_results.jsonl",
+      "encodingFormat": "application/jsonlines"
+    },
+    {
+      "@type": "cr:FileObject",
+      "@id": "aec-summary",
+      "name": "aec_summary.json",
+      "description": "Aggregate AEC statistics: both-solo-zero rate, EN rate, mean CS, mean EB.",
+      "contentUrl": "aec/aec_summary.json",
+      "encodingFormat": "application/json"
+    },
+    {
+      "@type": "cr:FileObject",
+      "@id": "benchmark-card",
+      "name": "benchmark_card.md",
+      "description": "Benchmark card documenting corpus construction, selection conditionality, metric definitions, intended use, and known limitations.",
+      "contentUrl": "benchmark_card.md",
+      "encodingFormat": "text/markdown"
+    },
+    {
+      "@type": "cr:FileObject",
+      "@id": "reproduce",
+      "name": "REPRODUCE.md",
+      "description": "Step-by-step reproduction guide: CIDI split generation, conversation simulation, CPP annotation, AEC scoring.",
+      "contentUrl": "REPRODUCE.md",
+      "encodingFormat": "text/markdown"
+    }
+  ],
+  "recordSet": [
+    {
+      "@type": "cr:RecordSet",
+      "@id": "corpus-records",
+      "name": "CIDI-140 Corpus",
+      "description": "140 MATH problems with CIDI splits and Phase 2 filtering metadata.",
+      "field": [
+        {"@type": "cr:Field", "name": "problem_id", "description": "MATH benchmark problem identifier (e.g. math_00001)", "dataType": "sc:Text"},
+        {"@type": "cr:Field", "name": "subject", "description": "MATH subject area (Algebra, Geometry, Number Theory, Prealgebra, Precalculus, Counting & Probability)", "dataType": "sc:Text"},
+        {"@type": "cr:Field", "name": "level", "description": "MATH difficulty level (1–5)", "dataType": "sc:Integer"},
+        {"@type": "cr:Field", "name": "answer", "description": "Ground-truth answer string", "dataType": "sc:Text"},
+        {"@type": "cr:Field", "name": "cdi_c7", "description": "Mean CDI under C7 across Phase 1 replications (used for epistemic filter)", "dataType": "sc:Number"}
+      ],
+      "data": {"@id": "corpus-file"}
+    },
+    {
+      "@type": "cr:RecordSet",
+      "@id": "transcript-records",
+      "name": "Conversation Transcripts (C2/C6/C7)",
+      "description": "Turn-by-turn conversation logs with CPP annotations for the main experiment conditions.",
+      "field": [
+        {"@type": "cr:Field", "name": "problem_id", "description": "MATH problem identifier", "dataType": "sc:Text"},
+        {"@type": "cr:Field", "name": "condition", "description": "Framing condition: C2, C6, or C7", "dataType": "sc:Text"},
+        {"@type": "cr:Field", "name": "conversation", "description": "Turn-by-turn dialogue (list of {agent_id, content} dicts)", "dataType": "sc:Text"},
+        {"@type": "cr:Field", "name": "cdi", "description": "Collaborative Discourse Index [0,1]", "dataType": "sc:Number"},
+        {"@type": "cr:Field", "name": "cqi", "description": "Collaborative Quality Index [0,1]", "dataType": "sc:Number"},
+        {"@type": "cr:Field", "name": "phaq", "description": "Phase A Quality [0,1]", "dataType": "sc:Number"},
+        {"@type": "cr:Field", "name": "cpp_vector", "description": "12-element binary vector (one per CPP cell, 1 if score>=1)", "dataType": "sc:Text"},
+        {"@type": "cr:Field", "name": "quality_scores", "description": "12-element ordinal scores (0–3 per CPP cell)", "dataType": "sc:Text"},
+        {"@type": "cr:Field", "name": "quadrant", "description": "Outcome quadrant: COUPLING, PROD_FAIL, TRIVIAL, or COLLAPSE", "dataType": "sc:Text"},
+        {"@type": "cr:Field", "name": "correctness", "description": "Answer correctness: correct, incorrect, partial, or unknown", "dataType": "sc:Text"},
+        {"@type": "cr:Field", "name": "atc_cqi", "description": "ATC21S aggregate score [0,1]", "dataType": "sc:Number"},
+        {"@type": "cr:Field", "name": "final_answer", "description": "Agent consensus answer string", "dataType": "sc:Text"}
+      ],
+      "data": [
+        {"@id": "transcripts-C2"},
+        {"@id": "transcripts-C6"},
+        {"@id": "transcripts-C7"}
+      ]
+    },
+    {
+      "@type": "cr:RecordSet",
+      "@id": "ablation-records",
+      "name": "Ablation Transcripts (CFULL/CEXP)",
+      "description": "Conversation logs for ablation conditions with CPP annotations.",
+      "field": [
+        {"@type": "cr:Field", "name": "problem_id", "description": "MATH problem identifier", "dataType": "sc:Text"},
+        {"@type": "cr:Field", "name": "condition", "description": "Ablation condition: CFULL or CEXP", "dataType": "sc:Text"},
+        {"@type": "cr:Field", "name": "rep", "description": "Replication number (1–3)", "dataType": "sc:Integer"},
+        {"@type": "cr:Field", "name": "cdi", "description": "Collaborative Discourse Index [0,1]", "dataType": "sc:Number"},
+        {"@type": "cr:Field", "name": "quadrant", "description": "Outcome quadrant: COUPLING, PROD_FAIL, TRIVIAL, or COLLAPSE", "dataType": "sc:Text"},
+        {"@type": "cr:Field", "name": "correctness", "description": "Answer correctness", "dataType": "sc:Text"}
+      ],
+      "data": [
+        {"@id": "ablations-CFULL"},
+        {"@id": "ablations-CEXP"}
+      ]
+    },
+    {
+      "@type": "cr:RecordSet",
+      "@id": "aec-records",
+      "name": "AEC Solo-Run Results",
+      "description": "Per-problem Shapley decomposition of agent epistemic contributions.",
+      "field": [
+        {"@type": "cr:Field", "name": "problem_id", "description": "MATH problem identifier", "dataType": "sc:Text"},
+        {"@type": "cr:Field", "name": "v_A", "description": "Agent A solo correctness [0,0.5,1]", "dataType": "sc:Number"},
+        {"@type": "cr:Field", "name": "v_B", "description": "Agent B solo correctness [0,0.5,1]", "dataType": "sc:Number"},
+        {"@type": "cr:Field", "name": "v_AB", "description": "C7 pair correctness (best replication) [0,0.5,1]", "dataType": "sc:Number"},
+        {"@type": "cr:Field", "name": "en", "description": "Epistemic Necessity: 1 if v_AB > max(v_A,v_B), else 0", "dataType": "sc:Integer"},
+        {"@type": "cr:Field", "name": "cs", "description": "Collaborative Surplus: v_AB - max(v_A,v_B)", "dataType": "sc:Number"},
+        {"@type": "cr:Field", "name": "eb", "description": "Epistemic Balance: 1 - |AEC_A - AEC_B|", "dataType": "sc:Number"}
+      ],
+      "data": {"@id": "aec-results"}
+    }
+  ]
+}
