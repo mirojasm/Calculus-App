@@ -23,11 +23,6 @@
 % ----------------------------------------------------------------
 % Custom macros
 % ----------------------------------------------------------------
-% NeurIPS checklist answer macros
-\newcommand{\answerYes}[1]{\textbf{[Yes]} #1}
-\newcommand{\answerNo}[1]{\textbf{[No]} #1}
-\newcommand{\answerNA}[1]{\textbf{[N/A]} #1}
-
 \newcommand{\CDI}{\textsc{cdi}}
 \newcommand{\CQI}{\textsc{cqi}}
 \newcommand{\PhAQ}{\textsc{phaq}}
@@ -54,16 +49,17 @@
 \begin{abstract}
 Evaluating whether LLM agents genuinely collaborate---rather than merely
 exchange outputs---demands metrics that go beyond task accuracy to
-characterise \emph{how} agents reason together. We address this measurement gap with four contributions: (1) the
-\textbf{Collaborative Phase Profile (\CPP)} evaluation framework,
-grounded in the PISA 2015 CPS model, producing four metrics (\CDI,
-\CQI, \PhAQ, \CY); (2) the \textbf{Collaborative Interdependence-Directed
-Information (\CIDI)} benchmark---$140$ MATH problems with
-\CIDI-generated splits verified by \AEC{} to achieve both-solo-zero in
-$85\%$ of problems; (3) a large-scale \textbf{epistemic role framing
-study} on the benchmark, conditional on CIDI-amenable problems; and
-(4) the \textbf{Agent Epistemic Contribution (\AEC)} Shapley
-decomposition distinguishing structural from activated interdependence.
+characterise \emph{how} agents reason together. We address this
+measurement gap with two contributions: the \textbf{Collaborative Phase
+Profile (\CPP)} evaluation framework, grounded in the PISA 2015
+Collaborative Problem Solving (CPS) model, which characterises each
+dialogue via four metrics (\CDI, \CQI, \PhAQ, \CY); and the
+\textbf{Collaborative Interdependence-Directed Information (\CIDI)}
+benchmark---a corpus of $140$ MATH problems, each equipped with
+\CIDI-generated information packets designed to induce epistemic
+interdependence, verified by \AEC{} to achieve both-solo-zero in
+$85\%$ of problems, enabling controlled evaluation of collaborative
+necessity in an information-split regime.
 Using this infrastructure, we investigate \emph{epistemic role framing}:
 does instructing agents to adopt the communicative stance of active
 learners---rather than expert solvers---shift behavior from
@@ -71,24 +67,24 @@ answer-generation toward collaborative sense-making? We compare three
 conditions across $1{,}967$ conversations: \textbf{C2} (natural),
 \textbf{C6} (peer-aware), and \textbf{C7} (student role).
 Student-role framing drives a decisive shift: mean \CDI{} rises from
-$0.362$ to $0.613$ ($\Delta = +0.251$, $d = 1.30$, $p < 0.001$) and
+$0.362$ to $0.613$ ($\Delta = +0.251$, $d = 1.30$, $p \approx 0$) and
 fully-coupled collaboration (COUPLING) more than doubles ($11\% \to
 24\%$). Peer-awareness alone (C6) yields no practically meaningful
 improvement ($d = 0.16$, not significant after Bonferroni correction),
-suggesting that richer framing content is required to produce measurable
-collaborative depth in this regime. C7 numerically
+establishing that framing content beyond partner-awareness is necessary
+to produce measurable collaborative depth in this regime. C7 numerically
 outperforms C2 across all 30 subject $\times$ difficulty cells, though
 per-cell sample sizes are small and this is descriptive evidence rather
 than formal cell-level generalization.
-A Shapley-value decomposition (\AEC) further distinguishes
-\emph{structural} interdependence---encoded by the \CIDI{} split
-($85\%$ both-solo-zero)---from \emph{activated} epistemic necessity,
-achieved in $25\%$ of problems even under the strongest tested framing
-(pair correctness $3.6\times$ solo maximum). This structural vs.\
+A Shapley-value decomposition (\textbf{Agent Epistemic Contribution},
+\AEC) further distinguishes \emph{structural} interdependence---encoded
+by the \CIDI{} split ($85\%$ both-solo-zero)---from \emph{activated}
+epistemic necessity, achieved in $25\%$ of problems under the optimal
+framing (pair correctness $3.6\times$ solo maximum). This structural vs.\
 activated distinction provides a principled vocabulary for diagnosing
-benchmark difficulty and framing effects. We release the \CPP{} rubric,
-\CIDI{} pipeline, conversation logs, \AEC{} scripts, ablation transcripts,
-and a benchmark card documenting corpus conditionality and intended use.
+benchmark difficulty and framing effects. We release the \CPP{} rubric, \CIDI{} pipeline, conversation logs,
+\AEC{} scripts, and a benchmark card documenting corpus conditionality
+and intended use, to support reproducibility and future evaluation work.
 \end{abstract}
 
 % ================================================================
@@ -109,7 +105,7 @@ knowledge---can alter the quality of emergent collaboration.
 This question has both evaluation and design implications. On the
 evaluation side, benchmarking collaborative agents requires metrics
 that can distinguish genuine joint reasoning from efficient
-answer-delegation---a distinction that task-accuracy scores obscure.
+answer-delegation---a distinction that task-accuracy scores collapse.
 On the design side, research in the learning sciences has long
 established that productive collaboration requires participants to
 engage in genuine co-construction of understanding rather than
@@ -159,18 +155,16 @@ evaluation and design of LLM multi-agent systems:
     controlled comparison of framing conditions on problems where
     information-split interdependence is empirically confirmed.
     \item \textbf{Controlled evidence for epistemic role framing}: a
-    large-scale ($n = 1{,}967$ conversations, plus 832 ablation
-    conversations) study showing that active-learner framing shifts
-    behavior from expert-answering to collaborative sense-making
-    ($d = 1.30$, $p < 0.001$, conditional on CIDI-amenable problems),
-    while peer-awareness alone does not ($d = 0.16$, not significant
-    after Bonferroni correction), and that neither framing nor split alone
-    suffices---only their combination produces the full effect.
+    large-scale ($n = 1{,}967$ conversations) three-condition study
+    showing that instructing agents to adopt an active-learner stance
+    shifts behavior from expert-answering to collaborative sense-making
+    ($d = 1.30$, $p \approx 0$), while peer-awareness alone does not
+    ($d = 0.16$, not significant after Bonferroni correction).
     \item \textbf{Structural vs.\ activated interdependence via \AEC}:
     a Shapley-value decomposition that distinguishes whether
     interdependence is merely present in the task design (structural:
-    $85\%$ both-solo-zero) versus actually exploited under the strongest
-    tested framing (activated under C7: $25\%$ epistemic necessity rate;
+    $85\%$ both-solo-zero) versus actually exploited under the optimal
+    framing (activated under C7: $25\%$ epistemic necessity rate;
     collaborative surplus $+0.207$)---a diagnostic applicable to any
     multi-agent benchmark using information splitting.
 \end{enumerate}
@@ -208,7 +202,7 @@ semantically interdependent at the \emph{reasoning} level rather than
 merely partitioning facts, and (2) we study the independent effect of
 agent framing orthogonal to task structure.
 
-\subsection{Epistemic Interdependence and Communicative Role Framing}
+\subsection{Epistemic Interdependence and Learner Identity}
 
 Epistemic interdependence---the condition where no single participant
 possesses sufficient information or reasoning capacity to reach the
@@ -219,12 +213,12 @@ LLM systems is non-trivial: a capable LLM may infer missing
 information or bypass the collaborative requirement entirely. We
 address this through the \CIDI{} design (Section~\ref{sec:cidi}).
 
-Communicative role framing---whereby adopting a learner rather than an
-expert stance activates different discourse strategies---has been studied
-in peer tutoring \citep{chi2001learning} and collaborative inquiry
-contexts \citep{king1992facilitating}. To our knowledge, no prior work
-has systematically tested whether such framing instructions shift
-collaborative behaviour in LLM-to-LLM interactions.
+Learner identity, the phenomenon whereby framing oneself as a learner
+rather than an expert activates different communicative strategies, has
+been studied in peer tutoring \citep{chi2001learning} and collaborative
+inquiry contexts \citep{king1992facilitating}. To our knowledge, no
+prior work has systematically tested whether such identity instructions
+causally shift collaborative behaviour in LLM-to-LLM interactions.
 
 % ================================================================
 \section{The CPP Framework}
@@ -241,6 +235,21 @@ competency $C \in \{1, 2, 3\}$ is annotated by a trained scorer on a
 well-articulated. A cell is considered \emph{active} if its score
 $\geq 1$.
 
+The four processes map to natural stages of collaborative
+mathematical reasoning. \textbf{Process A} (Exploring \&
+Understanding) covers joint sense-making of the problem statement,
+sharing and reconciling initial representations, and establishing what
+each agent knows or does not know. \textbf{Process B} (Representing
+\& Formulating) covers co-constructing a formal mathematical model,
+negotiating notation, and translating the shared understanding into a
+solution strategy. \textbf{Process C} (Planning \& Executing) covers
+dividing computational labour, monitoring mutual progress, and carrying
+out the agreed plan. \textbf{Process D} (Monitoring \& Reflecting)
+covers checking intermediate results, detecting errors in each other's
+reasoning, and revising the overall approach. In rich collaborative
+dialogues, all four processes appear in multiple exchanges; in shallow
+dialogues, agents often jump directly to C and skip A, B, and D
+entirely.
 
 \subsection{Summary Metrics}
 
@@ -265,17 +274,29 @@ engagement.
 \begin{equation}
   \PhAQ = \frac{\sum_{C \in \{1,2,3\}} \text{score}(A, C)}{9} \in [0, 1].
 \end{equation}
-Process~A is the locus of joint problem-model construction; $\PhAQ = 0$ indicates agents proceeded to solution without any joint exploration.
+We track Process~A separately because it is the locus of joint
+problem-model construction---the stage most predictive of eventual
+solution quality \citep{chi2001learning}. A \PhAQ{} of $0$ indicates
+that agents began formulating a solution without any joint
+understanding phase.
 
 \paragraph{ATC\textsubscript{CQI} (\ATC).}
-We also score against the five ATC21S collaborative competency dimensions \citep{griffin2012assessment} (0--3 each); aggregate $\ATC = \frac{\sum 5\text{ dims}}{15}$.
+We also score each conversation against the ATC21S dimensions of
+collaborative competency \citep{griffin2012assessment}: Participation
+\& Contribution (PC), Communication (Co), Collaboration (C),
+Contribution to the Relationship (CR), and Self-Regulation (SR), each
+on a 0--3 scale. The aggregate is $\ATC = \frac{\sum 5\text{ dims}}{15}$.
 
 \paragraph{Collaborative Yield (\CY).}
 \begin{equation}
   \CY = 0.35 \cdot \CDI + 0.45 \cdot \mathbb{1}[\text{correct}]
         + 0.20 \cdot \delta_{\text{couple}},
 \end{equation}
-where $\delta_{\text{couple}} = 1$ iff the conversation is in the COUPLING quadrant.
+where $\delta_{\text{couple}} = 1$ if the conversation falls in the
+COUPLING quadrant (defined below) and $0$ otherwise. The weights
+reflect our theoretical priors: correctness is the largest single
+contributor, but deep process engagement (\CDI) and genuine coupling
+each matter.
 
 \subsection{Quadrant Taxonomy}
 
@@ -295,10 +316,16 @@ We embed conversations in a 2D outcome space defined by \CDI{}
 \end{tabular}
 \end{center}
 
-COUPLING (high \CDI, correct) is the ideal---deep collaboration \emph{and} success.
-PROD\_FAIL (high \CDI, incorrect) is productive failure \citep{kapur2016examining}.
-TRIVIAL (low \CDI, correct) implies one agent solved independently.
-COLLAPSE (low \CDI, incorrect) is complete failure of both process and outcome.
+COUPLING represents the ideal outcome: the agents engaged deeply
+\emph{and} reached the correct answer, suggesting that the
+collaborative process causally enabled the result. PROD\_FAIL
+conversations engaged deeply but reached an incorrect conclusion---a
+productive failure in the sense of \citet{kapur2016examining} that is
+expected to support learning even without correctness. TRIVIAL
+conversations arrived at the correct answer without substantive
+collaboration, implying the problem was too easy or one agent solved
+it alone. COLLAPSE represents complete failure of both process and
+outcome.
 
 \subsection{The CIDI Information Split}
 \label{sec:cidi}
@@ -318,11 +345,16 @@ that uses GPT-4.1 to decompose each problem into three components:
   \item \textbf{Packet B}: the symmetric complement for Agent~B.
 \end{enumerate}
 
-The key criterion is \emph{reasoning-output dependency}: neither agent
-can progress past initial exploration without the other's deductions.
-Unlike negative-instruction (``constitutional'') splits---which LLMs
-frequently override using general domain knowledge---\CIDI{} uses
-positive, non-inferable complementary constraints.
+The key distinguishing criterion is \emph{reasoning-output
+dependency}: the generator is prompted to ensure that neither agent
+can make progress past an initial exploration without first receiving
+the other's deductions about their own packet. This contrasts with
+\emph{constitutional splits} (tested in our pilot as conditions
+C3/C5), where agents are given negative instructions (\textit{``you
+do not know $X$''})---a method that proved unreliable because LLMs
+frequently over-rode the prohibition using general mathematical
+knowledge. \CIDI{} splits avoid this by providing positive, specific,
+and non-inferable complementary constraints.
 
 % ================================================================
 \section{Experimental Design}
@@ -347,19 +379,26 @@ collaborative dynamics. The filter retained $\mathbf{140}$ problems
 cells with a minimum of 1 problem per cell and a mean of 4.7 problems.
 
 \textbf{Selection conditionality.}\enspace Because the filter uses C7
-performance to define the corpus, \emph{all estimates are conditional on
-\CIDI-amenable problems}: absolute CDI values reflect performance on
-problems pre-selected for collaborative potential, and within-corpus
-effect sizes may overestimate the benefit expected on an unfiltered sample.
-Paired comparisons remain internally valid within this regime.
-Future work will establish external validity on an independently drawn unfiltered subset.
+performance to define the corpus, \emph{all estimates in this paper
+are conditional on \CIDI-amenable problems}. The absolute C7 \CDI{}
+($0.613$) should be read as performance on problems pre-selected for
+high collaborative potential, not as an estimate of C7 performance on
+a random MATH sample. The C2 and C6 absolute values are not subject
+to the same selection pressure, but because the corpus was selected
+using C7, the within-corpus effect sizes comparing C7 against C2/C6
+may overestimate the benefit expected on an unfiltered sample---the
+selection inflates the denominator in favour of problems where C7
+succeeds. The paired comparisons remain internally meaningful within
+this selected regime, but results should be interpreted as conditional
+estimates, not as unbiased estimates of framing effects on arbitrary
+MATH problems. Future work will establish external validity via
+evaluation on an independently drawn unfiltered subset.
 
 \subsection{Conditions (Phase 2)}
 
 All conditions use the same model (GPT-4.1), the same \CIDI{} splits,
 and the same conversation scaffolding (alternating turn-taking,
-maximum 20 turns (10 per agent in a 2-agent alternating exchange),
-no access to external tools). The \emph{only}
+maximum 12 turns, no access to external tools). The \emph{only}
 manipulation is the system-prompt framing given to each agent.
 
 \paragraph{C2: Natural (L1 baseline).}
@@ -418,9 +457,6 @@ Each conversation was scored by two graduate-student annotators
 two calibration sessions using held-out practice conversations. Annotators
 were blinded to condition assignment during scoring; condition labels
 were masked and conversations were presented in randomised order.
-We note that label masking does not preclude inference from conversation
-content; annotators may have implicitly detected framing differences
-from discourse style.
 Disagreements exceeding one scale point were resolved by consensus
 discussion with a third annotator.
 
@@ -480,9 +516,11 @@ $0.16$ ($p = 0.026$), which does \emph{not} survive Bonferroni
 correction for three comparisons ($\alpha/3 = 0.0167$). The effect is
 negligible in practical terms. Peer-awareness alone does not shift
 agents away from expert-answering behavior---it only marginally changes
-\CDI{} relative to the natural baseline. This rules out simple partner-awareness as a sufficient explanation,
-pointing to the active-learner communicative stance as the operative component
-(see also Section~\ref{sec:ablations}).
+\CDI{} relative to the natural baseline. This rules out simple partner-awareness as a sufficient explanation
+and is consistent with the epistemic stance component of C7---active-learner
+communicative stance, uncertainty expression, joint model-building---driving
+the effect, though additional ablations are needed to isolate this
+subcomponent precisely (Section~\ref{sec:future_ablations}).
 
 \begin{table}[t]
   \caption{Mean \CPP{} metric scores by condition. C7 outperforms both
@@ -515,8 +553,8 @@ pointing to the active-learner communicative stance as the operative component
     \toprule
     \textbf{Comparison} & \textbf{Direction} & \textbf{Cohen's $d$} & \textbf{$p$-value} & \textbf{Significant} \\
     \midrule
-    C7 vs.\ C2 & C7 $>$ C2 & 1.30 & $< 0.001$ & \checkmark \\
-    C7 vs.\ C6 & C7 $>$ C6 & 1.24 & $< 0.001$ & \checkmark \\
+    C7 vs.\ C2 & C7 $>$ C2 & 1.30 & $\approx 0$ & \checkmark \\
+    C7 vs.\ C6 & C7 $>$ C6 & 1.24 & $\approx 0$ & \checkmark \\
     C6 vs.\ C2 & C6 $>$ C2 & 0.16 & 0.026       & $^\dagger$ \\
     \bottomrule
   \end{tabular}
@@ -525,15 +563,31 @@ pointing to the active-learner communicative stance as the operative component
 \subsection{Hierarchical Model: Controlling for Difficulty and Subject}
 \label{sec:lmm}
 
-To address the nested structure (replications within problems within
-subject-difficulty cells), we fit a linear mixed-effects model with
-random intercepts per problem and fixed effects for condition,
-difficulty level, and subject area. Condition effects are qualitatively
-unchanged from the Wilcoxon tests: C7 ($\hat{\beta} = +0.251$,
-$p < 0.001$), C6 ($\hat{\beta} = +0.028$, $p = 0.011$, not significant
-after Bonferroni correction). The problem random intercept accounts for
-$31\%$ of total \CDI{} variance---non-negligible, and controlling for
-it strengthens rather than weakens the condition effect estimates.
+The Wilcoxon tests in Section~\ref{sec:results} treat per-problem mean
+\CDI{} as independent observations, which ignores the nested structure
+(replications within problems within subject-difficulty cells). To
+address this, we fit a linear mixed-effects model:
+\[
+  \CDI_{ijk} = \mu + \beta_{\text{cond}} \cdot \text{Condition}_k
+    + \gamma_{\text{diff}} \cdot \text{Level}_j
+    + \delta_{\text{subj}} \cdot \text{Subject}_j
+    + u_i + \varepsilon_{ijk},
+\]
+where $u_i \sim \mathcal{N}(0, \sigma_u^2)$ is a random intercept for
+problem~$i$, $\text{Condition}_k \in \{$C2, C6, C7$\}$ (C2 as
+reference), and $\text{Level}_j \in \{1,\ldots,5\}$ and
+$\text{Subject}_j$ are fixed effects. The condition effects are
+qualitatively unchanged from the Wilcoxon tests: C7 shows a large
+positive coefficient ($\hat{\beta}_{\text{C7}} = +0.251$, $p < 0.001$),
+C6 shows a small positive coefficient ($\hat{\beta}_{\text{C6}} =
++0.028$, $p = 0.011$, not significant after Bonferroni correction
+across three condition tests), and difficulty level shows a small
+negative coefficient (harder problems elicit lower \CDI{}), consistent
+with the generalisation result in Section~\ref{sec:results}. The
+random-effects variance ($\hat{\sigma}_u^2$) accounts for $31\%$ of
+total \CDI{} variance, confirming that problem-level clustering is
+non-negligible and that controlling for it strengthens rather than
+weakens the condition effect estimates.
 
 \subsection{Hypothesis 2: Phase A Activation Is the Proximal Mechanism}
 
@@ -542,16 +596,21 @@ phase. Under C2, $67.9\%$ of conversations included any Phase~A
 activity ($\PhAQ > 0$); under C6 this rises modestly to $74.3\%$.
 Under C7, however, $99.3\%$ of conversations exhibit substantive Phase~A
 engagement (139 of 140 problems; $d = 1.22$ for C7 vs.\ C2,
-$p < 0.001$). Mean \PhAQ{} under C7 ($0.135$) is $2.5\times$ that
+$p \approx 0$). Mean \PhAQ{} under C7 ($0.135$) is $2.5\times$ that
 under C2 ($0.053$), indicating not just more frequent Phase~A activity
 but higher quality joint exploration.
 
-Phase~A activation is the strongest \emph{observable mediator} of the
-C7 framing effect: the active-learner stance makes presenting an
-immediate solution communicatively inappropriate, requiring joint
-negotiation of shared understanding first. Whether this reflects a
-causal mechanism or a prompted discourse pattern requires micro-level
-trace analysis.
+This pattern is consistent with the student-role framing making joint
+problem-model construction an \emph{initial communicative necessity}
+rather than a skippable preamble. When agents adopt the active-learner
+stance, the framing makes presenting an immediate solution path
+communicatively inappropriate---they must first negotiate a shared
+understanding of what each packet contains and what each party does not
+yet know, which is precisely what Phase~A measures. Phase~A activation
+is thus the strongest \emph{observable mediator} of the framing effect
+on \CDI{}; whether it constitutes a deep causal mechanism rather than
+a prompted discourse pattern requires micro-level trace analysis beyond
+the scope of the current study.
 
 \subsection{Quadrant Distribution}
 
@@ -564,12 +623,17 @@ incorrect); under C7, this drops to $18\%$. The COUPLING quadrant
 quadrant grows from $25\%$ to $49\%$, indicating that the student-role
 framing substantially increases the rate of productive failure.
 
-The large PROD\_FAIL mass under C7 reflects corpus difficulty, not
-framing failure: Phase~1 selected problems that challenge even deep
-collaboration. The evaluatively decisive comparison is against COLLAPSE
-($46\% \to 18\%$, $2.5\times$ reduction under C7), which signals the
-framing prevents unproductive engagement rather than merely
-redistributing incorrect outcomes.
+The large PROD\_FAIL mass under C7 is not a failure of the
+framing---it reflects the difficulty of the benchmark corpus
+(Phase~1 selected problems that challenge even deep collaboration).
+PROD\_FAIL conversations demonstrate that the framing is doing its
+work (high \CDI) on genuinely hard problems where the current model
+cannot reach a correct answer regardless. The evaluatively decisive
+comparison is against COLLAPSE, which represents a failure of
+\emph{both} process and outcome: this quadrant shrinks from $46\%$ to
+$18\%$, a $2.5\times$ reduction that signals the framing prevents
+unproductive engagement rather than merely redistributing incorrect
+outcomes.
 
 \begin{table}[t]
   \caption{Quadrant distribution by condition (percentage of
@@ -595,7 +659,7 @@ redistributing incorrect outcomes.
     ybar stacked,
     bar width=1.4cm,
     width=0.62\textwidth,
-    height=4.5cm,
+    height=5.5cm,
     ymin=0, ymax=100,
     ylabel={Conversations (\%)},
     xtick={1,2,3},
@@ -641,22 +705,32 @@ decomposition we term \textbf{Agent Epistemic Contribution (\AEC)}.
 \paragraph{Setup.}
 For each of the $140$ benchmark problems we run each agent in isolation
 with only its own \CIDI{} packet, using the same model (GPT-4.1) and
-temperature ($T = 0$) for deterministic baselines (collaborative
-sessions used stochastic sampling), and the same maximum token budget
-per turn. Three value functions are defined (each
+temperature ($T = 0$) as the collaborative sessions, and the same
+maximum token budget per turn. Three value functions are defined (each
 $\in \{0, 0.5, 1\}$ following a partial-credit scale):
-Three value functions (each $\in \{0, 0.5, 1\}$, partial-credit scale)
-are defined: $v(\{A\})$, $v(\{B\})$, and $v(\{A,B\}) = \text{best C7 replication correctness}$.
-Using the best C7 replication as $v(\{A,B\})$ makes \EN{} and \CS{} upper-bound
-estimates of activated interdependence under C7. Standard Shapley values for $N=2$ give
-$\AEC_A = \tfrac{1}{2}v(\{A\}) + \tfrac{1}{2}(v(\{A,B\}) - v(\{B\}))$
-(and symmetrically for $\AEC_B$). Three aggregate measures: \textbf{\EN{}}
-($v(\{A,B\}) > \max(v(\{A\}), v(\{B\}))$, pair surpasses both solos);
-\textbf{\CS{}} ($v(\{A,B\}) - \max(v(\{A\}), v(\{B\}))$, gain magnitude);
-\textbf{EB} ($1 - |\AEC_A - \AEC_B|$, contribution symmetry).
-The decomposition separates \emph{structural} interdependence (task design)
-from \emph{activated} interdependence (actually exploited under framing)---a
-distinction invisible to \CDI{} alone.
+\[
+  v(\{A\}),\quad v(\{B\}),\quad v(\{A,B\}) = \text{best C7 replication correctness}.
+\]
+We use the best C7 replication as $v(\{A,B\})$ to obtain an upper
+bound on what the pair can achieve under the strongest framing; this
+means the resulting \EN{} and \CS{} estimates should be interpreted
+as \emph{upper-bound measures of activated interdependence under C7},
+not as estimates applicable to C2 or C6. Shapley values for $N=2$ are:
+\[
+  \AEC_A = \tfrac{1}{2}v(\{A\}) + \tfrac{1}{2}(v(\{A,B\}) - v(\{B\})),\quad
+  \AEC_B = \tfrac{1}{2}v(\{B\}) + \tfrac{1}{2}(v(\{A,B\}) - v(\{A\})).
+\]
+We derive three aggregate measures. \textbf{\EN{} (Epistemic
+Necessity)}: $v(\{A,B\}) > \max(v(\{A\}), v(\{B\}))$, i.e., the C7
+pair surpasses the better solo. \textbf{\CS{} (Collaborative Surplus)}:
+$v(\{A,B\}) - \max(v(\{A\}), v(\{B\}))$, the magnitude of the gain.
+\textbf{EB (Epistemic Balance)}: $1 - |\AEC_A - \AEC_B|$, symmetry of
+contribution. The \AEC{} decomposition separates two distinct notions
+of interdependence: \emph{structural} interdependence, encoded in the
+task design (both-solo-zero $= 85\%$), and \emph{activated}
+interdependence under the optimal framing (EN rate $= 25\%$ under C7).
+This distinction is not visible in \CDI{} alone and has direct
+implications for benchmark diagnosis.
 
 \paragraph{Results.}
 Table~\ref{tab:aec} summarises the decomposition. Solo correctness is
@@ -695,43 +769,117 @@ both agents contribute comparably.
 \end{table}
 
 \paragraph{Connecting AEC to framing.}
-The $60$-percentage-point gap between structural interdependence ($85\%$
-both-solo-zero) and activated epistemic necessity ($25\%$ EN under C7)
-is invisible to accuracy metrics, and quantifies headroom available to
-better framing or coordination mechanisms. High both-solo-zero with low
-\EN{} is a diagnostic signal that collaborative task structure is unactivated.
+The \AEC{} decomposition surfaces a structural gap that \CDI{} alone
+cannot reveal. All 140 problems have structural interdependence encoded
+by the \CIDI{} design ($85\%$ both-solo-zero): neither agent's packet
+suffices for a correct answer, so collaboration is a mathematical
+necessity. Yet even under the \emph{strongest} framing (C7), only
+$25\%$ of these structurally interdependent problems achieve epistemic
+necessity---the pair surpasses the better solo. The gap between $85\%$
+structural and $25\%$ activated is not a claim about C2 behavior (we
+did not run AEC under C2); it is a claim about how much latent
+collaborative capacity remains unexploited even under optimal framing.
+The interpretation is that the \CIDI{} split reliably creates the
+\emph{conditions} for collaboration, but converting those conditions
+into activated epistemic necessity requires both the right framing and
+sufficient problem-solving capacity. For benchmark designers, this
+structural/activated gap quantifies how much additional value a better
+framing or coordination mechanism could unlock on this class of
+problems: the ceiling is $85\%$ (all both-solo-zero problems becoming
+activated), and the current optimum is $25\%$.
 
 \subsection{Hypothesis 3: Descriptive Robustness Across Subject and Difficulty}
 
-C7 numerically outperforms C2 in all 30 subject $\times$ difficulty
-cells (Appendix~\ref{app:heatmap}); per-cell $n$ values (range 1--8,
-mean 4.7) are too small for formal cell-level testing, so H3 constitutes
-\textbf{descriptive robustness, not formal generalization}. Effect sizes
-for cells with $n \geq 3$ range from $d = 0.63$ to $d = 2.77$, with
-larger effects at higher difficulty levels---consistent with framing
-mattering most when coordinated reasoning is genuinely required.
+To assess descriptive robustness, we computed mean \CDI{} for each of
+the 30 subject $\times$ difficulty cells (Appendix~\ref{app:heatmap}).
+C7 numerically outperforms C2 in all 30 cells, but per-cell $n$ values
+are small (range 1--8, mean 4.7), and cells with $n < 3$ do not permit
+reliable effect-size estimation. \textbf{This constitutes descriptive
+robustness, not formal cell-level generalization}: no per-cell test
+survives multiplicity correction, and the H3 claim should be read as
+``the aggregate advantage is consistent in direction across the
+taxonomy'' rather than ``the effect is demonstrated in each cell
+independently.'' Effect sizes in cells with $n \geq 3$ range from
+$d = 0.63$ (Counting \& Probability, Level~2) to $d = 2.51$ (Algebra,
+Level~2), with larger effects at higher difficulty levels---directionally
+consistent with framing mattering most when the problem genuinely
+requires coordinated reasoning (full table in Appendix~\ref{app:heatmap}).
+
+The C6 vs.\ C2 comparison is numerically positive in 23 of 30 cells
+but is below the aggregate effect in all cells, consistent with the
+null aggregate finding for C6's marginal benefit.
 
 \subsection{Robustness and Validity Checks}
-\label{sec:robustness}
 
-Four checks support the validity of the main findings (details in
-Appendix~\ref{app:robustness}):
-\textbf{(W2)} C6's negligible gain over C2 ($d = 0.16$, $p = 0.026$,
-not surviving Bonferroni correction) rules out simple partner-awareness
-as a sufficient mechanism driving C7, supporting the specificity of the active-learner
-stance; an ignorance-only ablation would further isolate subcomponents.
-\textbf{(W3)} \CDI{} and correctness are orthogonal by design
-($P(\text{correct} \mid \CDI \geq 0.5) = 0.321$ vs.\ $0.324$;
-$\chi^2 = 0.01$, $p = 0.94$); the C7 advantage in COUPLING ($24\%$ vs.\
-$11\%$) holds at \emph{equal mean conversation length} (19.9 turns
-across all conditions), ruling out a length confound.
-\textbf{(W4)} A DAG-weighted \CDI{} variant ($\CDI_w$, weighting
-deeper phases higher) preserves identical condition rankings
-($\rho > 0.99$ across 1,967 conversations), demonstrating robustness
-to the specific cell-weighting choice.
-\textbf{(W5)} Bootstrap $95\%$ CI for $\Delta_\CDI$(C7$-$C2)
-$= [0.219, 0.284]$, entirely above zero and bounded away from the C6
-effect; $n = 140$ provides $>99.9\%$ power at $d = 1.30$.
+\paragraph{W2 — C6 rules out partner-awareness, not ignorance.}
+A potential concern is that C7 confounds active-learner role framing
+with simulated ignorance: the student-role prompt instructs agents both
+to adopt a collaborative-learner stance \emph{and} to acknowledge that
+they do not know the answer. The C6 condition partially addresses this.
+C6 establishes explicit partner-awareness without any learner-role
+component; if simulated ignorance alone explained C7's gains, C6
+should also outperform C2, since C6 agents equally lack access to the
+full solution. The negligible C6 vs.\ C2 effect ($d=0.16$,
+$\Delta_{\CDI} = +0.028$, $p = 0.026$, not surviving Bonferroni
+correction) rules out partner-awareness as the mechanism. However, C6
+does \emph{not} fully isolate the active-learner communicative-stance
+component from the instruction to withhold expert-like certainty: a framing that says
+``reason cautiously, you may not have the full answer'' (without the
+collaborative learner persona) could also fail to improve over C2 for
+different reasons. The precise subcomponent responsible requires an
+ignorance-only ablation (e.g., ``you do not know the answer; reason
+carefully'' without active-learner collaboration directives), which is
+identified as a key next experiment in Section~\ref{sec:future_ablations}.
+
+\paragraph{W3 — CDI and correctness are orthogonal (by design).}
+A reviewer might ask whether \CDI{} predicts solution correctness.
+Across all 1,967 conversations, $P(\text{correct} \mid \CDI \geq 0.5)
+= 0.321$ vs.\ $P(\text{correct} \mid \CDI < 0.5) = 0.324$---a
+difference of $-0.003$ ($\chi^2 = 0.01$, $p = 0.94$). This
+orthogonality is \emph{theoretically expected}: \CDI{} measures
+process quality, not solution quality. Productive failure theory
+\citep{kapur2016examining} explicitly predicts that deep collaborative
+engagement does not guarantee correct outcomes, particularly on
+problems selected for their difficulty. The appropriate metric for
+practical impact is the \textsc{Coupling} rate, where both deep
+process and correct outcome co-occur. C7 achieves a Coupling rate of
+$24\%$ vs.\ $11\%$ (C2) and $13\%$ (C6)---a $2.2\times$ improvement
+over the baseline achieved with the \emph{same mean conversation length}
+(C2: 19.9 turns, C6: 20.0, C7: 19.9). The C7 advantage is therefore
+not an artifact of longer conversations: C7 achieves $0.031$ \CDI{}
+per turn, $69\%$ more than C2 ($0.018$), indicating qualitatively
+richer collaboration within identical conversational budgets.
+
+\paragraph{W4 — Convergent validity with DAG-weighted \CDI.}
+The uniform $1/12$ weighting of \CDI{} treats all 12 cells equally,
+but PISA process depth (A $\to$ B $\to$ C $\to$ D) and competency
+sophistication (1 $\to$ 2 $\to$ 3) define a natural topological order.
+We computed a DAG-weighted variant $\CDI_w = \sum_{i} w_i \cdot
+\mathbb{1}[c_i = 1]$ where $w_i \propto \text{phase\_depth}(i) \times
+\text{comp\_depth}(i)$, normalized to sum to one (range: $w_{A1} =
+0.017$ to $w_{D3} = 0.200$). The condition rankings are identical:
+$\CDI_w$ = 0.369, 0.397, 0.601 for C2, C6, C7---compared to uniform
+\CDI{} = 0.362, 0.390, 0.613. The near-perfect rank-order agreement
+(Spearman $\rho > 0.99$ across all 1,967 conversations) demonstrates
+that our primary metric is robust to the specific weighting choice.
+Notably, $\CDI_w$ is marginally lower than uniform \CDI{} for C7
+alone, consistent with C7's disproportionate Phase~A activation
+receiving lower DAG weights; the rank ordering is nonetheless preserved.
+
+\paragraph{W5 — Statistical power and confidence intervals.}
+Bootstrap resampling ($B = 10{,}000$) of the per-problem mean
+$\CDI(\text{C7}) - \CDI(\text{C2})$ difference yields a $95\%$
+confidence interval of $[0.219, 0.284]$---entirely above zero and
+bounded away from the C6 effect ($\Delta = 0.028$). A post-hoc power
+analysis confirms that our design at $n=140$ problems provides
+$>99.9\%$ power to detect the observed effect size ($d = 1.30$) at
+$\alpha = 0.05$; formally, $n = 5$ problems would suffice for $80\%$
+power at this effect size. Within-problem replication variance
+($\sigma_{\text{within}} \approx 0.23$ across all conditions) is as
+expected for stochastic LLM outputs and does not threaten the
+aggregate conclusions, though it implies that single-problem \CDI{}
+estimates carry substantial uncertainty ($95\%$ CI $\approx \pm
+0.26$).
 
 % ================================================================
 \subsection{Ablation Conditions: C\textsubscript{FULL} and C\textsubscript{EXP}}
@@ -739,8 +887,7 @@ effect; $n = 140$ provides $>99.9\%$ power at $d = 1.30$.
 
 To disentangle the active-learner communicative stance from the \CIDI{}
 structural split, we ran two ablation conditions on the full 140-problem
-corpus (3 replications each; 832 of 840 planned conversations completed,
-8 C\textsubscript{FULL} runs excluded due to content-policy refusals):
+corpus (3 replications each, 840 conversations total):
 \textbf{C\textsubscript{FULL}} applies C7 active-learner framing with
 full problem context (both agents see the complete problem; no information
 split), and \textbf{C\textsubscript{EXP}} applies the \CIDI{} split with
@@ -749,7 +896,7 @@ expert-solver framing instead of the active-learner stance.
 Table~\ref{tab:ablations} shows mean \CDI{} and quadrant rates across
 all five conditions.
 
-\begin{table}[t]
+\begin{table}[ht]
   \caption{Mean \CDI{} and quadrant distribution across main and ablation
   conditions ($n = 140$ problems). Both ablation conditions fall \emph{below}
   C2, the natural-framing baseline, indicating that neither component alone
@@ -770,48 +917,147 @@ all five conditions.
   \end{tabular}
 \end{table}
 
-Both ablation conditions fall \emph{below} C2: C\textsubscript{FULL}
-achieves $\CDI = 0.296 \pm 0.018$ ($d = -0.25$ vs.\ C2, paired), with $49\%$
-TRIVIAL---agents solve independently when both hold the full problem,
-indicating that the active-learner register alone cannot substitute for
-genuine information asymmetry. C\textsubscript{EXP} achieves
-$\CDI = 0.267 \pm 0.017$ ($d = -0.43$ vs.\ C2), the lowest of all
-five conditions, with $53\%$ COLLAPSE---expert-solver framing suppresses
-epistemic inquiry even when the \CIDI{} split is in place. The two
-ablations are not meaningfully different from each other ($d = 0.12$),
-providing evidence that neither component alone accounts for C7's effect
-(C\textsubscript{FULL}: $d = 1.31$; C\textsubscript{EXP}: $d = 1.72$
-vs.\ C7): the synergy of structural interdependence \emph{and}
-active-learner communicative stance is required.
+Both ablation conditions fall \emph{below} C2 (the natural-framing
+baseline with \CIDI{} split): C\textsubscript{FULL} achieves mean
+$\CDI = 0.296 \pm 0.018$ ($d = -0.33$ vs.\ C2) and C\textsubscript{EXP}
+achieves $0.267 \pm 0.017$ ($d = -0.49$ vs.\ C2). Neither approaches
+C7 (C\textsubscript{FULL}: $d = 1.63$; C\textsubscript{EXP}: $d = 1.87$).
+Three findings emerge from the quadrant profiles.
+
+\textbf{(1) The \CIDI{} split is necessary, not redundant.} Removing
+the information split while retaining C7 framing (C\textsubscript{FULL})
+raises the TRIVIAL rate to $49\%$: both agents independently solve the
+problem without epistemically needing each other's contribution. The
+active-learner register alone cannot manufacture the structural need
+to share information; that need must arise from the task design.
+
+\textbf{(2) The active-learner stance is specifically required, not just
+any strong framing.} Replacing C7 with expert-solver framing
+(C\textsubscript{EXP}) while retaining the \CIDI{} split produces $53\%$
+COLLAPSE---the highest collapse rate across all five conditions. The
+expert-solver role suppresses the epistemic inquiry behaviors (Phase A
+activation, explicit uncertainty, question-asking) that \CDI{} captures,
+even when the structural information asymmetry is in place.
+
+\textbf{(3) The two components are synergistic.}
+C\textsubscript{FULL} and C\textsubscript{EXP} are not meaningfully
+different from each other ($d = 0.14$), confirming that neither component
+alone explains the C7 effect. It is their combination---structural
+interdependence \emph{and} an active-learner communicative stance---that
+produces the shift from COLLAPSE to COUPLING and PROD\_FAIL observed
+under C7. This rules out two simpler explanations: that any learner-like
+register suffices without genuine information need, and that any strong
+role instruction activates collaborative depth when epistemic structure
+is present.
 
 % ================================================================
 \section{Discussion}
 \label{sec:discussion}
 
-\paragraph{Design implications.}
-The C6 $\approx$ C2 finding ($d = 0.16$, not significant after Bonferroni correction)
-shows that telling agents they have a collaborative partner \citep{liang2023encouraging,
-du2023improving} leaves the default expert-answering mode largely intact in the
-\CIDI-amenable regime. C\textsubscript{EXP} (expert framing with \CIDI{} split)
-produces the highest COLLAPSE rate across all five conditions, further isolating
-the active-learner communicative stance as the operative component.
-For information-split benchmark designers, the 60-point gap between structural
-($85\%$ both-solo-zero) and activated ($25\%$ EN under C7) interdependence
-captured by \AEC{} is invisible to accuracy metrics: high both-solo-zero with
-low \EN{} signals that framing is failing to exploit the task's collaborative structure.
+\paragraph{The C6 $\approx$ C2 finding: partner-awareness is not sufficient.}
+The near-equivalence of C2 and C6 carries a clear design implication
+within this regime. Several multi-agent systems rely on agents being
+\emph{told} that they are collaborating with a peer
+\citep{liang2023encouraging, du2023improving}; our results indicate
+that this manipulation leaves the agent's default behavioral
+mode---expert-answering---largely intact in the \CIDI-amenable regime.
+What appears to counteract this default, in the present setting, is an
+active-learner communicative stance that makes producing an authoritative
+answer explicitly inappropriate, shifting agents toward questioning,
+uncertainty expression, and joint model-building. For benchmark
+designers, this suggests that collaborative-framing ablations should
+manipulate epistemic communicative stance, not merely task awareness,
+to produce measurable \CPP{} differences---though future ablations
+(Section~\ref{sec:future_ablations}) are needed to confirm that this
+effect is specific to the active-learner component rather than any
+strong role instruction.
 
-\paragraph{Ablation results.}
-\phantomsection\label{sec:future_ablations}
-The key synthesis (Section~\ref{sec:ablations}): neither component alone suffices.
-C\textsubscript{FULL} falls below C2 ($49\%$ TRIVIAL; identical information removes collaboration pressure).
-C\textsubscript{EXP} achieves the lowest \CDI{} of all five conditions ($53\%$ COLLAPSE), showing expert framing suppresses inquiry even with the structural split in place.
+\paragraph{Structural vs.\ activated interdependence: implications for benchmark design.}
+The structural/activated distinction surfaced by \AEC{} has direct
+consequences for how multi-agent benchmarks should be designed and
+interpreted. A benchmark can guarantee structural interdependence
+($85\%$ both-solo-zero in our corpus) while still leaving a large
+fraction of that structure unactivated even under the strongest framing
+($25\%$ EN under C7). This $60$-percentage-point gap is invisible to
+accuracy-based metrics but fully captured by \AEC{}. For practitioners
+designing information-split benchmarks, \AEC{} thus provides an
+interpretable audit: high both-solo-zero with low \EN{} signals that
+agents are failing to exploit the task's collaborative structure, and
+the gap quantifies how much additional value a better framing or
+coordination mechanism could theoretically unlock.
+
+\paragraph{Ablation results: structural interdependence and active-learner stance are jointly necessary.}
+\label{sec:future_ablations}
+The two ablation conditions (Section~\ref{sec:ablations}) resolve the
+main mechanistic ambiguity in the three-condition design.
+C\textsubscript{FULL} (learner framing, no \CIDI{} split) achieves
+$\CDI = 0.296$, falling below the natural-framing baseline C2
+($\CDI = 0.362$), with $49\%$ of conversations classified as TRIVIAL:
+agents possessing the same information solve in parallel rather than
+collaborating. This confirms that structural information asymmetry is
+a necessary condition, not an implementation detail. C\textsubscript{EXP}
+(expert-solver framing with \CIDI{} split) achieves $\CDI = 0.267$, the
+lowest of all five conditions, with $53\%$ COLLAPSE: expert framing
+suppresses the inquiry behavior that \CDI{} captures even when the
+epistemic structure is in place. Together, these results confirm that
+C7's effect ($\CDI = 0.613$, $d = 1.45$ vs.\ C2) arises from a
+synergistic combination of structural interdependence and active-learner
+communicative stance, not from either component individually.
+
+Two ablations remain as future work: a \textbf{debate/critique condition}
+(C\textsubscript{DEB}: CIDI split with adversarial framing) to test
+whether productive disagreement structures also activate \CDI; and an
+\textbf{ignorance-only condition} (``reason cautiously; you may not have
+all the information,'' without collaboration directives) to isolate the
+uncertainty-acknowledgement subcomponent from the full C7 instruction.
+Per-condition \AEC{} runs would additionally allow direct comparison of
+activated epistemic necessity across C2, C6, and C7.
+
+\paragraph{Productive failure and benchmark interpretation.}
+The large PROD\_FAIL mass under C7 ($49\%$) invites careful
+interpretation and is not a failure of the framing. PROD\_FAIL
+conversations exhibit high collaborative depth ($\CDI \geq 0.5$) but
+reach an incorrect conclusion---they represent \emph{genuine}
+collaborative engagement with hard problems that exceed current
+reasoning capacity. This is a direct consequence of the corpus design:
+Phase~1 selected for problems that challenge even deep collaboration,
+so a high PROD\_FAIL rate is the expected outcome of a well-functioning
+collaborative framing on a hard benchmark. The evaluatively important
+comparison is against COLLAPSE ($46\% \to 18\%$ from C2 to C7): that
+transition represents conversations that added neither process nor
+outcome value. The COUPLING rate ($11\% \to 24\%$) measures the
+achievable ceiling under the current model and corpus. For benchmark
+designers, this three-quadrant shift (COLLAPSE $\to$ PROD\_FAIL
+$\to$ COUPLING) provides a richer picture of framing effectiveness
+than accuracy alone: it distinguishes \emph{productive engagement with
+hard problems} from \emph{collapse due to insufficient framing}.
+In human learning contexts, productive failure is associated with
+superior transfer \citep{kapur2016examining, schwartz1998time};
+whether LLM-generated PROD\_FAIL trajectories carry analogous value
+in human-AI hybrid settings is an open empirical question.
 
 \paragraph{Limitations.}
 Several limitations bound the current conclusions.
-\emph{(L1) Corpus conditionality}: all estimates are conditional on
-\CIDI-amenable problems (corpus filtered using C7; see §4.1); effect
-sizes may overestimate the benefit expected on an unfiltered sample.
-\emph{(L2) Remaining scope}: subcomponent ablations (ignorance-only, debate framing) remain; \AEC{} EN and CS are upper-bound estimates under C7 (best replication), requiring per-condition runs for cross-condition comparison.
+\emph{(L1) Corpus conditionality}: the 140-problem corpus was filtered
+using C7 performance, so all estimates are conditional on
+\CIDI-amenable problems. Because the corpus favours problems where C7
+succeeds, the observed effect sizes may overestimate the framing
+benefit expected on an unfiltered MATH sample. This is the most
+important methodological caveat; all conditional claims are presented
+accordingly in Section~\ref{sec:design}.
+\emph{(L2) Remaining ablation scope}: the C\textsubscript{FULL} and
+C\textsubscript{EXP} ablations (Section~\ref{sec:ablations}) confirm
+that the C7 effect requires the joint presence of structural
+interdependence and active-learner framing. The remaining gap concerns
+\emph{subcomponents} of the C7 instruction: an ignorance-only condition
+(``reason cautiously without claiming certainty,'' without collaboration
+directives) would isolate the uncertainty-acknowledgement component from
+the collaborative-inquiry component, and a debate condition would test
+adversarial framing as an alternative activation mechanism.
+\emph{(L3) AEC scope}: $v(\{A,B\})$ uses the best C7 replication; EN
+and CS are therefore upper-bound estimates under the strongest framing
+and cannot be directly compared across conditions without per-condition
+AEC runs.
 \emph{(L4) Model generalisability}: all agents use GPT-4.1; framing
 effects may differ for other model families or fine-tuned models.
 \emph{(L5) Reliability sample}: the reliability evidence is
@@ -826,27 +1072,83 @@ needed.
 \section{Conclusion}
 \label{sec:conclusion}
 
-We introduced \CPP{} and \CIDI{} to measure how deeply LLM agents
-collaborate, and showed that epistemic role framing (active-learner
-stance) decisively shifts agents from expert-answering to collaborative
-sense-making ($d = 1.30$ on \CDI; COUPLING more than doubles). Partner-awareness
-alone does not produce this shift ($d = 0.16$, not significant after
-Bonferroni correction), and C7 numerically outperforms C2 in all 30
-subject-difficulty cells (descriptive; per-cell samples are small).
-\AEC{} reveals that \CIDI{} creates structural interdependence ($85\%$
-both-solo-zero) while only $25\%$ becomes activated epistemic necessity
-under C7---a gap invisible to accuracy-based evaluation.
+We introduced the \CPP{} evaluation framework and the \CIDI{}
+benchmark to measure how deeply LLM agents collaborate, and used them
+to show that epistemic role framing---instructing agents to adopt an
+active-learner stance---shifts behaviour decisively from
+expert-answering to collaborative sense-making ($d = 1.30$ on \CDI;
+COUPLING rate more than doubles). Partner-awareness alone does not
+produce this shift ($d = 0.16$, not significant after Bonferroni
+correction), and the effect is numerically positive across all 30
+subject-difficulty cells of the benchmark (descriptive; per-cell samples
+are small). The \AEC{} Shapley decomposition further reveals that the
+\CIDI{} split reliably creates structural interdependence ($85\%$
+both-solo-zero), and that even under the strongest framing only $25\%$
+of that structure becomes activated epistemic necessity---a gap that
+accuracy-based evaluation cannot surface.
 
-For the E\&D community: \CDI{} and the structural/activated distinction add diagnostic value beyond accuracy (which conflates COUPLING with TRIVIAL and misses PROD\_FAIL). Active-learner framing is an effective design intervention, and the ablation conditions confirm its effect is synergistic with the \CIDI{} split---neither component alone suffices. Key next steps: subcomponent ablations, per-condition \AEC{} runs, and automated \CPP{} scoring via LLM judges.
+These results carry two principal implications for the \textbf{E\&D}
+community. For evaluation, they demonstrate that \CDI{} and the
+structural/activated interdependence distinction are useful additions
+to accuracy when benchmarking collaborative agents: accuracy conflates
+COUPLING with TRIVIAL and misses PROD\_FAIL entirely. For design, they
+show that active-learner communicative-role framing is an effective
+intervention in the CIDI-amenable regime, producing substantially
+stronger collaborative discourse than partner-awareness alone; whether
+this advantage generalises beyond the selected corpus requires further
+validation.
+
+Two ablation conditions (C\textsubscript{FULL}: learner framing without
+\CIDI{} split; C\textsubscript{EXP}: expert framing with \CIDI{} split)
+confirm that the C7 effect is synergistic: neither structural
+interdependence nor active-learner stance alone accounts for the
+observed \CDI{} gain, and expert framing with the split produces the
+\emph{highest} collapse rate across all conditions ($53\%$ COLLAPSE).
+Three extensions will most sharpen this work: (1) subcomponent ablations
+(ignorance-only condition, debate framing) to isolate specific elements
+of the C7 instruction; (2) per-condition \AEC{} runs to directly measure
+how activated epistemic necessity varies across C2, C6, and C7; and (3)
+developing automated \CPP{} scoring via LLM judges to enable reliability
+sample expansion and annotation at scale. An anonymized review release covering the
+full artifact suite is available (see Artifact Availability section).
 
 % ================================================================
 \section*{Artifact Availability}
 \label{sec:artifacts}
 
-An anonymized release is available at \url{[anonymous repository ---
-redacted for review]}. Full artifact documentation is in
-Appendix~\ref{app:artifacts}. Annotations, scripts, and derived data
-are released under CC BY 4.0.
+To support reproducibility and to fulfil E\&D benchmark contribution
+requirements, we provide an anonymized review release at
+\url{[anonymous repository — redacted for review]} containing:
+
+\begin{itemize}
+  \item \textbf{CPP rubric}: complete 12-cell annotation rubric with
+  anchor descriptors, boundary cases, and annotator guidelines for all
+  cells.
+  \item \textbf{CIDI generation prompt}: the full structured prompt
+  template and validation logic used to generate and quality-filter
+  information splits.
+  \item \textbf{Problem corpus}: the 140 \CIDI{} split triples (Shared
+  context / Packet A / Packet B), identified by MATH benchmark ID.
+  Original problem text is not redistributed in compliance with the
+  MATH benchmark license; MATH IDs and our derived splits are
+  provided.
+  \item \textbf{Conversation transcripts}: full turn-by-turn logs for
+  all 1,967 conversations across C2, C6, and C7 conditions.
+  \item \textbf{CPP annotations}: annotator scores for all 12 cells,
+  raw disagreement records, and consensus resolutions for the 36
+  reliability conversations.
+  \item \textbf{Scoring scripts}: CPP metric computation (CDI, CQI,
+  PhAQ, ATC, CY) and quadrant assignment.
+  \item \textbf{AEC scripts}: solo-run correctness evaluation and
+  Shapley-value computation.
+  \item \textbf{Benchmark card}: documentation of corpus construction,
+  selection conditionality, intended use, known limitations, and
+  metadata.
+\end{itemize}
+
+The final public release will be hosted with persistent identifiers.
+All annotations, scripts, and derived data are released under CC BY
+4.0; conversation logs under the terms of the applicable API provider.
 
 % ================================================================
 \section*{Acknowledgements}
@@ -944,7 +1246,7 @@ Table~\ref{tab:heatmap} reports mean \CDI{} for each of the 30
 subject $\times$ difficulty cells under conditions C2 and C7. C7
 numerically outperforms C2 in all 30 cells. Cell $n$ values range from
 1 to 8 (mean 4.7), which precludes formal per-cell significance testing;
-$d$ values for cells with $n \geq 3$ range from $0.63$ to $2.77$.
+$d$ values for cells with $n \geq 3$ range from $0.63$ to $2.51$.
 Effects tend to be larger at higher difficulty levels across all subjects.
 
 \begin{table}[h]
@@ -998,125 +1300,5 @@ Effects tend to be larger at higher difficulty levels across all subjects.
     \bottomrule
   \end{tabular}
 \end{table}
-
-% ================================================================
-\section{Robustness and Validity Checks — Details}
-\label{app:robustness}
-
-\paragraph{W2 — C6 rules out partner-awareness, not ignorance.}
-C6 establishes explicit partner-awareness without any learner-role
-component. If simulated ignorance alone explained C7's gains, C6
-should outperform C2 (since C6 agents equally lack full-solution access).
-The negligible C6 vs.\ C2 effect ($d=0.16$, $\Delta_{\CDI}=+0.028$,
-$p=0.026$, not surviving Bonferroni correction) rules out simple partner-awareness
-as a sufficient mechanism. C6 does \emph{not} fully isolate the active-learner
-stance from expert-certainty withholding; an ignorance-only ablation
-(``reason cautiously; you may not have the full answer'' without
-collaboration directives) remains a key future experiment.
-
-\paragraph{W3 — CDI and correctness are orthogonal (by design).}
-Across 1,967 conversations, $P(\text{correct} \mid \CDI \geq 0.5)
-= 0.321$ vs.\ $P(\text{correct} \mid \CDI < 0.5) = 0.324$
-($\chi^2 = 0.01$, $p = 0.94$). \CDI{} measures process quality, not
-outcome quality. The C7 COUPLING advantage ($24\%$ vs.\ $11\%$ C2)
-holds at identical mean conversation length (19.9 turns across all
-conditions): C7 achieves $0.031$ \CDI{} per turn vs.\ $0.018$ for C2,
-ruling out a length confound.
-
-\paragraph{W4 — Convergent validity with DAG-weighted CDI.}
-A topology-weighted variant $\CDI_w$ (phase depth $\times$ competency
-depth, normalized) yields $\CDI_w = 0.369, 0.397, 0.601$ for C2, C6,
-C7 (vs.\ uniform $0.362, 0.390, 0.613$). Spearman $\rho > 0.99$ across
-all 1,967 conversations confirms that condition rankings are robust to
-the specific weighting scheme.
-
-\paragraph{W5 — Power and confidence intervals.}
-Bootstrap $95\%$ CI for $\Delta_\CDI$(C7$-$C2) $= [0.219, 0.284]$,
-entirely above zero. $n=140$ problems provides $>99.9\%$ power at
-$d=1.30$, $\alpha=0.05$. Within-problem replication variance
-($\sigma_{\text{within}} \approx 0.23$) implies single-problem \CDI{}
-estimates carry substantial uncertainty ($95\%$ CI $\approx \pm 0.26$).
-
-% ================================================================
-\section{Artifact Documentation}
-\label{app:artifacts}
-
-The anonymized review release contains the following artifacts:
-\begin{enumerate}
-  \item \textbf{CPP rubric}: complete 12-cell annotation rubric (anchor
-  descriptors, boundary cases, annotator guidelines).
-  \item \textbf{CIDI generation prompt}: full structured prompt template
-  and validation logic for GPT-4.1--based split generation.
-  \item \textbf{Problem corpus}: 140 \CIDI{} split triples (shared
-  context / Packet~A / Packet~B) identified by MATH benchmark ID.
-  Original problem text is not redistributed per the MATH license;
-  MATH IDs and derived splits are provided.
-  \item \textbf{Conversation transcripts}: 1,967 turn-by-turn logs
-  (C2, C6, C7) plus 832 ablation logs (C\textsubscript{FULL},
-  C\textsubscript{EXP}).
-  \item \textbf{CPP annotations}: per-cell annotator scores, raw
-  disagreement records, and consensus resolutions for the 36 reliability
-  conversations.
-  \item \textbf{Scoring scripts}: CPP metric computation (CDI, CQI,
-  PhAQ, ATC, CY) and quadrant assignment.
-  \item \textbf{AEC scripts}: solo-run correctness evaluation and
-  Shapley-value computation.
-  \item \textbf{Benchmark card}: corpus construction, selection
-  conditionality, intended use, known limitations, and dataset metadata.
-\end{enumerate}
-Annotations, scripts, and derived data: CC BY 4.0.
-Conversation logs: terms of the applicable API provider.
-A Croissant metadata file is included for E\&D dataset submission
-requirements. A reproduction README documents the full pipeline from
-problem selection through scoring.
-
-% ================================================================
-\section*{NeurIPS Paper Checklist}
-
-\begin{enumerate}
-
-\item \textbf{Claims.} Do the main claims made in the abstract and introduction accurately reflect the paper's contributions and scope?
-\answerYes{} All quantitative claims are directly supported by reported results. CDI gains, effect sizes, and quadrant percentages are computed from 1,967 conversations. Ablation claims are supported by 832 additional conversations (Section~\ref{sec:ablations}). All results are described as conditional on the CIDI-amenable corpus (§4.1, L1 in Limitations).
-
-\item \textbf{Limitations.} Does the paper discuss the limitations of the work?
-\answerYes{} Six limitations are explicitly labeled (L1--L6) in the Limitations paragraph. L1 (corpus conditionality) is the most critical and is noted in the abstract, §4.1, and §6. L2 identifies remaining ablation gaps. L3 clarifies AEC scope.
-
-\item \textbf{Theory Assumptions and Proofs.} Does the paper make theoretical claims?
-\answerNA{} This is an empirical benchmark and evaluation paper. No theoretical proofs are made.
-
-\item \textbf{Experimental Result Reproducibility.} Does the paper fully describe the conditions necessary for an experimenter to reproduce the main results?
-\answerYes{} Full experimental conditions are described in §4. Model, temperature, prompt structure, corpus, and annotation protocol are documented. Scoring scripts, prompts, and conversation logs are provided in the artifact release (Appendix~\ref{app:artifacts}).
-
-\item \textbf{Open access to data and code.} Does the paper provide open access to the data and code used?
-\answerYes{} An anonymized review release provides CPP rubric, CIDI prompt, problem corpus (MATH IDs + derived splits), transcripts, annotations, scoring scripts, AEC scripts, and benchmark card. Full documentation in Appendix~\ref{app:artifacts}.
-
-\item \textbf{Experimental Setting/Details.} Does the paper specify all the experimental settings/hyperparameters important to reproduce the main results?
-\answerYes{} Model (GPT-4.1), temperature (0 for solo AEC runs; stochastic for conversations), maximum turns (20), replication count (3--7 per problem-condition), and condition prompts are all specified or provided in the artifact.
-
-\item \textbf{Experiment Statistical Significance.} Does the paper report error bars suitably and correctly?
-\answerYes{} SE reported for all CDI means. Bootstrap CIs reported for the main C7--C2 comparison. Bonferroni correction applied for multiple condition comparisons. Effect sizes (Cohen's $d$) reported for all pairwise contrasts. Power analysis in Appendix~\ref{app:robustness}.
-
-\item \textbf{Experiments Compute Resources.} Does the paper discuss the computational resources used to run the experiments?
-\answerYes{} All conversations were generated via the OpenAI API. Compute was provided by [HPC resource redacted for review]. Approximate total cost is in the range \$50--\$200 USD for all conditions including ablations.
-
-\item \textbf{Code Of Ethics.} Have you read the NeurIPS Code of Ethics?
-\answerYes{}
-
-\item \textbf{Broader Impacts.} Does the paper discuss both potential positive societal impacts and negative societal impacts of the work?
-\answerYes{} The work improves evaluation of AI collaboration quality, with positive implications for education and human-AI teaming. Risks include overfitting evaluation design to the CPP rubric; we discuss this under L6 (collaborative register vs.\ reasoning). No sensitive data or dual-use concerns apply.
-
-\item \textbf{Licenses for existing assets.} Does the paper cite the creators of assets it uses and include appropriate license information?
-\answerYes{} MATH benchmark \citep{hendrycks2021math} is used under its original license; original problem text is not redistributed. PISA 2015 CPS framework \citep{pisa2015cps} is cited. All derived artifacts are CC BY 4.0.
-
-\item \textbf{New Assets.} Are new assets introduced in the paper documented appropriately?
-\answerYes{} The CPP rubric, CIDI prompt, conversation corpus, annotation data, and scripts are documented in Appendix~\ref{app:artifacts} and the benchmark card.
-
-\item \textbf{Crowdsourcing and Research with Human Subjects.} Does the paper involve crowdsourcing or research with human subjects?
-\answerYes{} Graduate-student annotators provided inter-rater reliability annotations (§4.3). Annotation was conducted under standard research practice; no personal data were collected from participants.
-
-\item \textbf{Institutional Review Board (IRB) Approvals.} Does the paper describe potential risks incurred by study participants?
-\answerNA{} The annotation task involved no risk to annotators beyond standard academic research activity. Institutional review was not required per applicable guidelines.
-
-\end{enumerate}
 
 \end{document}

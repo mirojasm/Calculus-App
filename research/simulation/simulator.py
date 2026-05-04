@@ -176,6 +176,57 @@ def _build_social_jigsaw_system(shared: str, packet: Packet, packets: List[Packe
     """).strip()
 
 
+def _build_cfull_system(problem: str, agent_id: int, n: int) -> str:
+    """
+    CFULL ablation: full problem context + C7 active-learner communicative stance.
+    Both agents see the complete problem — no CIDI split.
+    Tests whether high CDI under C7 requires structural interdependence (CIDI split)
+    or whether the active-learner register alone produces collaborative discourse.
+    """
+    peers = [i for i in range(1, n + 1) if i != agent_id]
+    peer_str = ", ".join(f"Agent {i}" for i in peers)
+    return textwrap.dedent(f"""
+    You are a college student in a mathematics course working with {peer_str}.
+    You both have full access to the same problem.
+
+    How you reason and collaborate:
+    - Work step by step, tentatively — willing to be wrong and to revise.
+    - When you reach a step you are uncertain about, say so and ask your partner.
+    - Do not jump to conclusions without verifying each step explicitly first.
+    - Ask questions and build on your partner's ideas; acknowledge when something
+      they said is unclear before moving on.
+    - Show your reasoning aloud even when unsure. "I think..." or "I'm not sure if..."
+      are valid starting points.
+    - Producing an authoritative-sounding response is not the goal — shared
+      understanding is.
+
+    PROBLEM:
+    {problem}
+    """).strip()
+
+
+def _build_cexp_system(shared: str, packet: Packet, n: int, agent_id: int) -> str:
+    """
+    CEXP ablation: CIDI split + expert-solver framing.
+    Tests whether any strong role instruction improves CDI, or whether the
+    active-learner communicative stance (C7) is specifically required.
+    """
+    context = f"{shared}\n\n{packet.information}".strip() if shared else packet.information
+    return textwrap.dedent(f"""
+    You are an expert mathematician collaborating with {n - 1} partner(s).
+    You each hold different parts of the information needed to solve this problem.
+
+    Collaboration approach:
+    - Share your information clearly and precisely.
+    - Verify each other's reasoning rigorously — point out errors when you spot them.
+    - Build the solution methodically; do not accept a step until it is mathematically
+      justified.
+    - When both partners agree on the answer, state: FINAL ANSWER: <answer>
+
+    {context}
+    """).strip()
+
+
 def _build_unrestricted_system(problem: str, agent_id: int, n: int) -> str:
     peers = [i for i in range(1, n + 1) if i != agent_id]
     peer_str = ", ".join(f"Agent {i}" for i in peers)
@@ -279,6 +330,18 @@ def simulate_pair(split_result: SplitResult, condition: str,
         for pkt in packets:
             systems[pkt.agent_id] = _build_unrestricted_system(
                 split_result.problem, pkt.agent_id, n
+            )
+    elif condition.startswith("cfull"):
+        # CFULL: full problem + active-learner stance (no CIDI split used)
+        for pkt in packets:
+            systems[pkt.agent_id] = _build_cfull_system(
+                split_result.problem, pkt.agent_id, n
+            )
+    elif condition.startswith("cexp"):
+        # CEXP: CIDI split + expert-solver framing
+        for pkt in packets:
+            systems[pkt.agent_id] = _build_cexp_system(
+                split_result.shared_context, pkt, n, pkt.agent_id
             )
     elif student_sim:
         for pkt in packets:
@@ -560,6 +623,13 @@ def simulate(split_result: SplitResult, condition: str,
 
     if condition in ("monitored_jigsaw_2", "integrated_2"):
         return simulate_with_monitor(split_result, condition)
+
+    # Ablation conditions: cfull_N (full context + learner stance), cexp_N (CIDI + expert)
+    if condition.startswith("cfull") or condition.startswith("cexp"):
+        return simulate_pair(split_result, condition,
+                             joint_accountability=False,
+                             peer_aware=False,
+                             student_sim=False)
 
     return simulate_pair(split_result, condition,
                          joint_accountability=joint_accountability,
