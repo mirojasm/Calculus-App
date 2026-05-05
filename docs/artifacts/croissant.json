@@ -11,7 +11,7 @@
   "name": "CIDI-140",
   "alternateName": "Collaborative Interdependence-Directed Information Benchmark",
   "description": "CIDI-140 is a benchmark of 140 MATH problems equipped with Collaborative Interdependence-Directed Information (CIDI) splits for studying epistemic role framing in LLM multi-agent collaboration. Each problem is decomposed into (shared context, Packet A, Packet B) such that neither agent can progress without the other's deductions. The dataset includes 2,112 conversation transcripts across three framing conditions (C2: natural, C6: peer-aware, C7: active-learner) and 832 ablation transcripts (CFULL: learner framing without split, CEXP: expert framing with split), annotated with CPP (Collaborative Phase Profile) metrics (CDI, CQI, PhAQ) and Agent Epistemic Contribution (AEC) Shapley decomposition.",
-  "url": "[anonymous repository — redacted for review]",
+  "url": "https://osf.io/2dytn/?view_only=bfda3073aca14cd2a52447994d4b8a56",
   "license": "https://creativecommons.org/licenses/by/4.0/",
   "version": "1.0.0",
   "datePublished": "2026-05-04",
