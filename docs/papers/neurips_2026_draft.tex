@@ -19,6 +19,7 @@
 \usepackage{array}
 \usepackage{pgfplots}
 \pgfplotsset{compat=1.18}
+\usepackage{float}
 
 % ----------------------------------------------------------------
 % Custom macros
@@ -53,42 +54,22 @@
 % ================================================================
 \begin{abstract}
 Evaluating whether LLM agents genuinely collaborate---rather than merely
-exchange outputs---demands metrics that go beyond task accuracy to
-characterise \emph{how} agents reason together. We address this measurement gap with four contributions: (1) the
-Collaborative Phase Profile (\CPP) evaluation framework,
-grounded in the PISA 2015 CPS model, producing four metrics (\CDI,
-\CQI, \PhAQ, \CY); (2) the Collaborative Interdependence-Directed
-Information (\CIDI) benchmark---$140$ MATH problems with
-\CIDI-generated splits verified by \AEC{} to achieve both-solo-zero in
-$85\%$ of problems; (3) a large-scale epistemic role framing
-study on the benchmark, conditional on CIDI-amenable problems; and
-(4) the Agent Epistemic Contribution (\AEC) Shapley
-decomposition distinguishing structural from activated interdependence.
-Using this infrastructure, we investigate \emph{epistemic role framing}:
-does instructing agents to adopt the communicative stance of active
-learners---rather than expert solvers---shift behavior from
-answer-generation toward collaborative sense-making? We compare three
-conditions across $1{,}967$ conversations: C2 (natural),
-C6 (peer-aware), and C7 (student role).
-Student-role framing drives a decisive shift: mean \CDI{} rises from
-$0.362$ to $0.613$ ($\Delta = +0.251$, $d = 1.30$, $p < 0.001$) and
-fully-coupled collaboration (COUPLING) more than doubles ($11\% \to
-24\%$). Peer-awareness alone (C6) yields no practically meaningful
-improvement ($d = 0.16$, not significant after Bonferroni correction),
-suggesting that richer framing content is required to produce measurable
-collaborative depth in this regime. C7 numerically
-outperforms C2 across all 30 subject $\times$ difficulty cells, though
-per-cell sample sizes are small and this is descriptive evidence rather
-than formal cell-level generalization.
-A Shapley-value decomposition (\AEC) further distinguishes
-\emph{structural} interdependence---encoded by the \CIDI{} split
-($85\%$ both-solo-zero)---from \emph{activated} epistemic necessity,
-achieved in $25\%$ of problems even under the strongest tested framing
-(pair correctness $3.6\times$ solo maximum). This structural vs.\
-activated distinction provides a principled vocabulary for diagnosing
-benchmark difficulty and framing effects. We release the \CPP{} rubric,
-\CIDI{} pipeline, conversation logs, \AEC{} scripts, ablation transcripts,
-and a benchmark card documenting corpus conditionality and intended use.
+exchange outputs---requires metrics beyond task accuracy. We introduce the
+Collaborative Phase Profile (\CPP), a PISA-grounded framework measuring
+collaborative depth, quality, Phase-A exploration, and collaborative yield,
+and the \CIDI{} benchmark: $140$ MATH problems with information splits
+designed to induce epistemic interdependence. Across $1{,}967$ conversations,
+active-learner framing increases \CDI{} from $0.362$ to $0.613$ ($d=1.30$,
+$p<0.001$) and more than doubles fully coupled collaboration ($11\%$ to $24\%$),
+while peer-awareness alone yields no practically meaningful gain after correction.
+Two full-corpus ablations show that neither active-learner framing without the
+split (C\textsubscript{FULL}) nor expert framing with the split (C\textsubscript{EXP})
+reproduces the effect, supporting a synergy between structural interdependence
+and communicative role framing. Agent Epistemic Contribution (\AEC) separates
+structural interdependence from activated epistemic necessity: $85\%$ of problems
+are both-solo-zero, yet only $25\%$ become activated under the strongest tested
+framing. We release \CPP, \CIDI{} splits, conversation logs, scoring scripts,
+\AEC{} scripts, and a benchmark card documenting corpus conditionality and intended use.
 \end{abstract}
 
 % ================================================================
@@ -142,89 +123,38 @@ competencies and derives four summary statistics: \CDI{} (breadth of
 phase engagement), \CQI{} (quality-weighted depth), \PhAQ{} (quality
 of joint exploration), and \CY{} (composite yield).
 
-\paragraph{Contributions.} This paper makes four contributions to the
-evaluation and design of LLM multi-agent systems:
+\paragraph{Contributions.}
 \begin{enumerate}
-    \item \textbf{The \CPP{} evaluation framework}: a principled,
-    reproducible scoring rubric for measuring collaborative depth in
-    LLM multi-agent dialogues, grounded in the PISA 2015 CPS competency
-    model. \CPP{} provides four complementary metrics (\CDI, \CQI,
-    \PhAQ, \CY) and a quadrant taxonomy (COUPLING / PROD\_FAIL /
-    TRIVIAL / COLLAPSE) that jointly characterise both process quality
-    and outcome.
-    \item \textbf{The \CIDI{} benchmark}: an interdependence-controlled
-    corpus of $140$ MATH problems with \CIDI-generated packets designed
-    to make collaboration structurally necessary, verified by \AEC{}
-    to yield both-solo-zero in $85\%$ of problems. The corpus enables
-    controlled comparison of framing conditions on problems where
-    information-split interdependence is empirically confirmed.
-    \item \textbf{Controlled evidence for epistemic role framing}: a
-    large-scale ($n = 1{,}967$ conversations, plus 832 ablation
-    conversations) study showing that active-learner framing shifts
-    behavior from expert-answering to collaborative sense-making
-    ($d = 1.30$, $p < 0.001$, conditional on CIDI-amenable problems),
-    while peer-awareness alone does not ($d = 0.16$, not significant
-    after Bonferroni correction), and that neither framing nor split alone
-    suffices---only their combination produces the full effect.
-    \item \textbf{Structural vs.\ activated interdependence via \AEC}:
-    a Shapley-value decomposition that distinguishes whether
-    interdependence is merely present in the task design (structural:
-    $85\%$ both-solo-zero) versus actually exploited under the strongest
-    tested framing (activated under C7: $25\%$ epistemic necessity rate;
-    collaborative surplus $+0.207$)---a diagnostic applicable to any
-    multi-agent benchmark using information splitting.
+    \item \textbf{\CPP}: a PISA-grounded 12-cell rubric producing \CDI, \CQI, \PhAQ, \CY, and a quadrant taxonomy (COUPLING / PROD\_FAIL / TRIVIAL / COLLAPSE).
+    \item \textbf{\CIDI{} benchmark}: $140$ MATH problems with epistemic-interdependence splits verified by \AEC{} ($85\%$ both-solo-zero).
+    \item \textbf{Framing study} ($1{,}967$ + $832$ ablation conversations): active-learner framing shifts behavior ($d=1.30$); peer-awareness alone does not; neither component alone suffices.
+    \item \textbf{\AEC{} decomposition}: separates structural ($85\%$ both-solo-zero) from activated ($25\%$ epistemic necessity) interdependence.
 \end{enumerate}
 
 % ================================================================
 \section{Background}
 \label{sec:background}
 
-\subsection{PISA 2015 Collaborative Problem Solving Framework}
+The PISA 2015 CPS framework characterises collaborative problem solving
+along a $4 \times 3$ grid of process phases (Exploring, Representing,
+Planning, Monitoring) and collaboration competencies (Shared Understanding,
+Action, Team Organisation) \citep{pisa2015cps}. We adapt this grid to
+LLM-to-LLM dialogues as the basis for \CPP{} (Section~\ref{sec:framework}).
 
-The OECD's PISA 2015 assessment introduced a widely cited framework
-that characterises collaborative problem solving along two axes: the
-\emph{problem-solving process} (Exploring \& Understanding~[A],
-Representing \& Formulating~[B], Planning \& Executing~[C], and
-Monitoring \& Reflecting~[D]) and the \emph{collaboration competency}
-(Establishing \& Maintaining Shared Understanding~[1], Taking
-Appropriate Action to Solve~[2], and Establishing \& Maintaining Team
-Organisation~[3]) \citep{pisa2015cps}. Their cross-product defines 12
-cells---e.g., \textit{A1}: jointly building an initial problem model,
-\textit{D3}: collectively revising the team's shared strategy. PISA
-operationalised these cells for human dyads; we adapt the framework to
-LLM conversations with minor modifications described in
-Section~\ref{sec:framework}.
+Prior multi-agent LLM work uses role differentiation \citep{park2023generative},
+debate \citep{liang2023encouraging}, and jigsaw information splitting
+\citep{du2023improving}. These designs focus on task-level architecture; we
+study instead how an agent's \emph{epistemic stance} affects collaborative
+depth, independent of task structure.
 
-\subsection{LLM Multi-Agent Systems}
-
-The design space for LLM multi-agent collaboration has expanded
-rapidly. Role-based differentiation (e.g., GPT-4 as planner vs.\
-executor \citep{park2023generative}), debate protocols that force
-agents to refine each other's outputs \citep{liang2023encouraging},
-and jigsaw information splitting \citep{du2023improving} each
-represent distinct mechanisms. Our work is closest to jigsaw designs,
-but differs in two respects: (1) we generate splits that are
-semantically interdependent at the \emph{reasoning} level rather than
-merely partitioning facts, and (2) we study the independent effect of
-agent framing orthogonal to task structure.
-
-\subsection{Epistemic Interdependence and Communicative Role Framing}
-
-Epistemic interdependence---the condition where no single participant
-possesses sufficient information or reasoning capacity to reach the
-goal alone---is a well-established predictor of productive
-collaboration in human learning \citep{barron2003conditions,
-johnson2009cooperative}. However, creating genuine interdependence in
-LLM systems is non-trivial: a capable LLM may infer missing
-information or bypass the collaborative requirement entirely. We
-address this through the \CIDI{} design (Section~\ref{sec:cidi}).
-
-Communicative role framing---whereby adopting a learner rather than an
-expert stance activates different discourse strategies---has been studied
-in peer tutoring \citep{chi2001learning} and collaborative inquiry
-contexts \citep{king1992facilitating}. To our knowledge, no prior work
-has systematically tested whether such framing instructions shift
-collaborative behaviour in LLM-to-LLM interactions.
+Epistemic interdependence---where no participant can reach the goal
+alone---predicts productive collaboration in human learning
+\citep{barron2003conditions,johnson2009cooperative}, but capable LLMs may
+bypass it by inferring missing information. Communicative role framing
+(learner vs.\ expert stance) activates different discourse strategies in
+peer tutoring \citep{chi2001learning,king1992facilitating}; whether it
+does so in LLM-to-LLM settings is untested. \CIDI{} and C7 operationalise
+and test both mechanisms jointly.
 
 % ================================================================
 \section{The CPP Framework}
@@ -639,23 +569,15 @@ neither agent could reach alone? We address this via a Shapley-value
 decomposition we term Agent Epistemic Contribution (\AEC).
 
 \paragraph{Setup.}
-For each of the $140$ benchmark problems we run each agent in isolation
-with only its own \CIDI{} packet, using the same model (GPT-4.1) and
-temperature ($T = 0$) for deterministic baselines (collaborative
-sessions used $T = 0.7$ with different random seeds), and the same
-maximum token budget per turn. Three value functions are defined,
-each on a partial-credit scale $\{0, 0.5, 1\}$:
-$v(\{A\})$, $v(\{B\})$, and $v(\{A,B\}) = \text{best C7 replication correctness}$.
-Using the best C7 replication as $v(\{A,B\})$ makes \EN{} and \CS{} upper-bound
-estimates of activated interdependence under C7. Standard Shapley values for $N=2$ give
-$\AEC_A = \tfrac{1}{2}v(\{A\}) + \tfrac{1}{2}(v(\{A,B\}) - v(\{B\}))$
-(and symmetrically for $\AEC_B$). Three aggregate measures: \EN{}
-($v(\{A,B\}) > \max(v(\{A\}), v(\{B\}))$, pair surpasses both solos);
-\CS{} ($v(\{A,B\}) - \max(v(\{A\}), v(\{B\}))$, gain magnitude);
-EB ($1 - |\AEC_A - \AEC_B|$, contribution symmetry).
-The decomposition separates \emph{structural} interdependence (task design)
-from \emph{activated} interdependence (actually exploited under framing)---a
-distinction invisible to \CDI{} alone.
+Each agent runs in isolation with only its own \CIDI{} packet (GPT-4.1,
+$T=0$ for deterministic baselines; collaborative sessions used $T=0.7$).
+Three value functions on $\{0, 0.5, 1\}$: $v(\{A\})$, $v(\{B\})$, and
+$v(\{A,B\}) = \text{best C7 replication correctness}$; standard $N=2$
+Shapley decomposition yields $\AEC_A$, $\AEC_B$ (formula in
+Appendix~\ref{app:robustness}). Three aggregate measures: \EN{}
+(pair surpasses both solos); \CS{} (gain over best solo);
+EB (Shapley balance). The decomposition separates \emph{structural}
+from \emph{activated} interdependence---a distinction invisible to \CDI{} alone.
 
 \paragraph{Results.}
 Table~\ref{tab:aec} summarises the decomposition. Solo correctness is
@@ -700,37 +622,21 @@ is invisible to accuracy metrics, and quantifies headroom available to
 better framing or coordination mechanisms. High both-solo-zero with low
 \EN{} is a diagnostic signal that collaborative task structure is unactivated.
 
-\subsection{Hypothesis 3: Descriptive Robustness Across Subject and Difficulty}
-
-C7 numerically outperforms C2 in all 30 subject $\times$ difficulty
-cells (Appendix~\ref{app:heatmap}); per-cell $n$ values (range 1--8,
-mean 4.7) are too small for formal cell-level testing, so H3 constitutes
-\emph{descriptive robustness, not formal generalization}. Effect sizes
-for cells with $n \geq 3$ range from $d = 0.63$ to $d = 2.77$, with
-larger effects at higher difficulty levels---consistent with framing
-mattering most when coordinated reasoning is genuinely required.
-
-\subsection{Robustness and Validity Checks}
+\subsection{Robustness and Validity}
 \label{sec:robustness}
 
-Four checks support the validity of the main findings (details in
-Appendix~\ref{app:robustness}):
-(W2) C6's negligible gain over C2 ($d = 0.16$, $p = 0.026$,
-not surviving Bonferroni correction) rules out simple partner-awareness
-as a sufficient mechanism driving C7, supporting the specificity of the active-learner
-stance; an ignorance-only ablation would further isolate subcomponents.
-(W3) \CDI{} and correctness are orthogonal by design
-($P(\text{correct} \mid \CDI \geq 0.5) = 0.321$ vs.\ $0.324$;
-$\chi^2 = 0.01$, $p = 0.94$); the C7 advantage in COUPLING ($24\%$ vs.\
-$11\%$) holds at \emph{equal mean conversation length} (19.9 turns
-across all conditions), ruling out a length confound.
-(W4) A DAG-weighted \CDI{} variant ($\CDI_w$, weighting
-deeper phases higher) preserves identical condition rankings
-($\rho > 0.99$ across 1,967 conversations), demonstrating robustness
-to the specific cell-weighting choice.
-(W5) Bootstrap $95\%$ CI for $\Delta_\CDI$(C7$-$C2)
-$= [0.219, 0.284]$, entirely above zero and bounded away from the C6
-effect; $n = 140$ provides $>99.9\%$ power at $d = 1.30$.
+C7 numerically outperforms C2 in all 30 subject $\times$ difficulty cells
+(Appendix~\ref{app:heatmap}); per-cell $n$ is too small for formal
+cell-level testing, so this is \emph{descriptive robustness, not formal
+generalization}.
+Four validity checks (details in Appendix~\ref{app:robustness}):
+partner-awareness alone is insufficient (C6 vs.\ C2: $d=0.16$,
+$p=0.026$, not surviving Bonferroni correction);
+\CDI{} is orthogonal to correctness ($\chi^2=0.01$, $p=0.94$),
+and the C7 COUPLING advantage holds at equal mean turn count ($19.9$);
+DAG-weighted \CDI$_w$ preserves condition rankings ($\rho>0.99$);
+bootstrap $95\%$ CI for $\Delta_{\CDI}$(C7$-$C2) $= [0.219, 0.284]$,
+$n=140$ power $>99.9\%$ at $d=1.30$.
 
 % ================================================================
 \subsection{Ablation Conditions: C\textsubscript{FULL} and C\textsubscript{EXP}}
@@ -749,7 +655,7 @@ expert-solver framing instead of the active-learner stance.
 Table~\ref{tab:ablations} shows mean \CDI{} and quadrant rates across
 all five conditions.
 
-\begin{table}[t]
+\begin{table}[H]
   \caption{Mean \CDI{} and quadrant distribution across main and ablation
   conditions ($n = 140$ problems). Both ablation conditions fall \emph{below}
   C2, the natural-framing baseline, indicating that neither component alone
@@ -811,12 +717,12 @@ Several limitations bound the current conclusions.
 \CIDI-amenable problems (corpus filtered using C7; see §4.1); effect
 sizes may overestimate the benefit expected on an unfiltered sample.
 \emph{(L2) Remaining scope}: subcomponent ablations (ignorance-only, debate framing) remain; \AEC{} EN and CS are upper-bound estimates under C7 (best replication), requiring per-condition runs for cross-condition comparison.
-\emph{(L4) Model generalisability}: all agents use GPT-4.1; framing
+\emph{(L3) Model generalisability}: all agents use GPT-4.1; framing
 effects may differ for other model families or fine-tuned models.
-\emph{(L5) Reliability sample}: the reliability evidence is
+\emph{(L4) Reliability sample}: the reliability evidence is
 preliminary ($n=36$); per-cell $\kappa$ estimates require $\geq 100$
 conversations.
-\emph{(L6) Collaborative register vs.\ reasoning}: we cannot rule out
+\emph{(L5) Collaborative register vs.\ reasoning}: we cannot rule out
 that C7 agents produce high-\CDI{} discourse without the underlying
 reasoning structure that \CPP{} assumes; micro-level trace analysis is
 needed.
@@ -827,7 +733,7 @@ needed.
 
 We introduced \CPP{} and \CIDI{} to measure how deeply LLM agents
 collaborate, and showed that epistemic role framing (active-learner
-stance) decisively shifts agents from expert-answering to collaborative
+stance) substantially shifts agents from expert-answering to collaborative
 sense-making ($d = 1.30$ on \CDI; COUPLING more than doubles). Partner-awareness
 alone does not produce this shift ($d = 0.16$, not significant after
 Bonferroni correction), and C7 numerically outperforms C2 in all 30
@@ -836,23 +742,10 @@ subject-difficulty cells (descriptive; per-cell samples are small).
 both-solo-zero) while only $25\%$ becomes activated epistemic necessity
 under C7---a gap invisible to accuracy-based evaluation.
 
-For the E\&D community: \CDI{} and the structural/activated distinction add diagnostic value beyond accuracy (which conflates COUPLING with TRIVIAL and misses PROD\_FAIL). Active-learner framing is an effective design intervention in the \CIDI-amenable regime, and the ablation conditions confirm its effect is synergistic with the \CIDI{} split---neither component alone suffices.
+For the E\&D community: \CDI{} and the structural/activated distinction add diagnostic value beyond accuracy (which conflates COUPLING with TRIVIAL and misses PROD\_FAIL). Active-learner framing is an effective design intervention in the \CIDI-amenable regime, and the ablation conditions support the interpretation that its effect is synergistic with the \CIDI{} split---neither component alone suffices.
+An anonymized review release is available; see Appendix~\ref{app:artifacts} for full artifact documentation.
 
-% ================================================================
-\section*{Artifact Availability}
-\label{sec:artifacts}
-
-An anonymized release is available at \url{https://osf.io/2dytn/?view_only=bfda3073aca14cd2a52447994d4b8a56}. Full artifact documentation is in
-Appendix~\ref{app:artifacts}. Annotations, scripts, and derived data
-are released under CC BY 4.0.
-
-% ================================================================
-\section*{Acknowledgements}
-This work was supported in part by [Funding agency redacted for
-anonymous review]. We thank the research assistants who provided
-annotation for the \CPP{} rubric. Compute was provided by [HPC
-resource redacted for anonymous review].
-
+\clearpage
 \bibliography{references}
 
 % ================================================================
@@ -1039,7 +932,9 @@ estimates carry substantial uncertainty ($95\%$ CI $\approx \pm 0.26$).
 \section{Artifact Documentation}
 \label{app:artifacts}
 
-The anonymized review release contains the following artifacts:
+The anonymized review release is available at
+\begin{sloppypar}\noindent\url{https://osf.io/2dytn/?view_only=bfda3073aca14cd2a52447994d4b8a56}\end{sloppypar}
+and contains the following artifacts:
 \begin{enumerate}
   \item \textbf{CPP rubric}: complete 12-cell annotation rubric (anchor
   descriptors, boundary cases, annotator guidelines).
