@@ -481,8 +481,8 @@ correction for three comparisons ($\alpha/3 = 0.0167$). The effect is
 negligible in practical terms. Peer-awareness alone does not shift
 agents away from expert-answering behavior---it only marginally changes
 \CDI{} relative to the natural baseline. This rules out simple partner-awareness as a sufficient explanation,
-pointing to the active-learner communicative stance as the operative component
-(see also Section~\ref{sec:ablations}).
+supporting the interpretation that the active-learner communicative stance
+is a key operative component (see also Section~\ref{sec:ablations}).
 
 \begin{table}[t]
   \caption{Mean \CPP{} metric scores by condition. C7 outperforms both
@@ -642,11 +642,10 @@ decomposition we term \textbf{Agent Epistemic Contribution (\AEC)}.
 For each of the $140$ benchmark problems we run each agent in isolation
 with only its own \CIDI{} packet, using the same model (GPT-4.1) and
 temperature ($T = 0$) for deterministic baselines (collaborative
-sessions used stochastic sampling), and the same maximum token budget
-per turn. Three value functions are defined (each
-$\in \{0, 0.5, 1\}$ following a partial-credit scale):
-Three value functions (each $\in \{0, 0.5, 1\}$, partial-credit scale)
-are defined: $v(\{A\})$, $v(\{B\})$, and $v(\{A,B\}) = \text{best C7 replication correctness}$.
+sessions used $T = 0.7$ with different random seeds), and the same
+maximum token budget per turn. Three value functions are defined,
+each on a partial-credit scale $\{0, 0.5, 1\}$:
+$v(\{A\})$, $v(\{B\})$, and $v(\{A,B\}) = \text{best C7 replication correctness}$.
 Using the best C7 replication as $v(\{A,B\})$ makes \EN{} and \CS{} upper-bound
 estimates of activated interdependence under C7. Standard Shapley values for $N=2$ give
 $\AEC_A = \tfrac{1}{2}v(\{A\}) + \tfrac{1}{2}(v(\{A,B\}) - v(\{B\}))$
@@ -740,7 +739,8 @@ effect; $n = 140$ provides $>99.9\%$ power at $d = 1.30$.
 To disentangle the active-learner communicative stance from the \CIDI{}
 structural split, we ran two ablation conditions on the full 140-problem
 corpus (3 replications each; 832 of 840 planned conversations completed,
-8 C\textsubscript{FULL} runs excluded due to content-policy refusals):
+8 C\textsubscript{FULL} runs excluded pre-scoring due to content-policy refusals;
+imputing them as CDI$=0$ leaves conclusions unchanged):
 \textbf{C\textsubscript{FULL}} applies C7 active-learner framing with
 full problem context (both agents see the complete problem; no information
 split), and \textbf{C\textsubscript{EXP}} applies the \CIDI{} split with
@@ -793,15 +793,14 @@ The C6 $\approx$ C2 finding ($d = 0.16$, not significant after Bonferroni correc
 shows that telling agents they have a collaborative partner \citep{liang2023encouraging,
 du2023improving} leaves the default expert-answering mode largely intact in the
 \CIDI-amenable regime. C\textsubscript{EXP} (expert framing with \CIDI{} split)
-produces the highest COLLAPSE rate across all five conditions, further isolating
-the active-learner communicative stance as the operative component.
-For information-split benchmark designers, the 60-point gap between structural
+produces the highest COLLAPSE rate across all five conditions, supporting the
+interpretation that the active-learner stance is the key operative component.
+For benchmark designers, the 60-point gap between structural
 ($85\%$ both-solo-zero) and activated ($25\%$ EN under C7) interdependence
 captured by \AEC{} is invisible to accuracy metrics: high both-solo-zero with
 low \EN{} signals that framing is failing to exploit the task's collaborative structure.
 
 \paragraph{Ablation results.}
-\phantomsection\label{sec:future_ablations}
 The key synthesis (Section~\ref{sec:ablations}): neither component alone suffices.
 C\textsubscript{FULL} falls below C2 ($49\%$ TRIVIAL; identical information removes collaboration pressure).
 C\textsubscript{EXP} achieves the lowest \CDI{} of all five conditions ($53\%$ COLLAPSE), showing expert framing suppresses inquiry even with the structural split in place.
@@ -837,7 +836,7 @@ subject-difficulty cells (descriptive; per-cell samples are small).
 both-solo-zero) while only $25\%$ becomes activated epistemic necessity
 under C7---a gap invisible to accuracy-based evaluation.
 
-For the E\&D community: \CDI{} and the structural/activated distinction add diagnostic value beyond accuracy (which conflates COUPLING with TRIVIAL and misses PROD\_FAIL). Active-learner framing is an effective design intervention, and the ablation conditions confirm its effect is synergistic with the \CIDI{} split---neither component alone suffices. Key next steps: subcomponent ablations, per-condition \AEC{} runs, and automated \CPP{} scoring via LLM judges.
+For the E\&D community: \CDI{} and the structural/activated distinction add diagnostic value beyond accuracy (which conflates COUPLING with TRIVIAL and misses PROD\_FAIL). Active-learner framing is an effective design intervention in the \CIDI-amenable regime, and the ablation conditions confirm its effect is synergistic with the \CIDI{} split---neither component alone suffices.
 
 % ================================================================
 \section*{Artifact Availability}
@@ -1091,7 +1090,7 @@ problem selection through scoring.
 \answerYes{} An anonymized review release provides CPP rubric, CIDI prompt, problem corpus (MATH IDs + derived splits), transcripts, annotations, scoring scripts, AEC scripts, and benchmark card. Full documentation in Appendix~\ref{app:artifacts}.
 
 \item \textbf{Experimental Setting/Details.} Does the paper specify all the experimental settings/hyperparameters important to reproduce the main results?
-\answerYes{} Model (GPT-4.1), temperature (0 for solo AEC runs; stochastic for conversations), maximum turns (20), replication count (3--7 per problem-condition), and condition prompts are all specified or provided in the artifact.
+\answerYes{} Model (GPT-4.1), temperature ($T = 0$ for solo AEC runs; $T = 0.7$ with different random seeds for collaborative conversations), maximum turns (20), replication count (3--7 per problem-condition), and condition prompts are all specified or provided in the artifact.
 
 \item \textbf{Experiment Statistical Significance.} Does the paper report error bars suitably and correctly?
 \answerYes{} SE reported for all CDI means. Bootstrap CIs reported for the main C7--C2 comparison. Bonferroni correction applied for multiple condition comparisons. Effect sizes (Cohen's $d$) reported for all pairwise contrasts. Power analysis in Appendix~\ref{app:robustness}.
@@ -1115,7 +1114,7 @@ problem selection through scoring.
 \answerYes{} Graduate-student annotators provided inter-rater reliability annotations (§4.3). Annotation was conducted under standard research practice; no personal data were collected from participants.
 
 \item \textbf{Institutional Review Board (IRB) Approvals.} Does the paper describe potential risks incurred by study participants?
-\answerNA{} The annotation task involved no risk to annotators beyond standard academic research activity. Institutional review was not required per applicable guidelines.
+\answerYes{} Annotation involved graduate research assistants scoring model-generated mathematical text; no personal data were collected. The activity was treated as minimal-risk annotation under applicable institutional practice, and participants were compensated for their time. No formal IRB review was required under these conditions.
 
 \end{enumerate}
 
