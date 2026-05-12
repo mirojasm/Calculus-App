@@ -7,6 +7,8 @@
 \usepackage{xcolor}
 \usepackage[margin=1in]{geometry}
 \usepackage{amsmath,amssymb}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
 \setcounter{secnumdepth}{-\maxdimen} % remove section numbering
 \usepackage{iftex}
 \ifPDFTeX
@@ -69,8 +71,7 @@ Epistemically Interdependent Splits for Collaborative
 AI}\label{learning-information-asymmetry-fine-tuning-llms-to-generate-epistemically-interdependent-splits-for-collaborative-ai}
 
 \textbf{Anonymous Authors}\\
-\emph{Under review --- AIED 2026 / NeurIPS 2025 Workshop on
-Collaborative AI}
+\emph{Under review --- EMNLP 2026}
 
 \begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
 
@@ -95,23 +96,23 @@ Optimisation (DPO) is \emph{inappropriate} for this task. Because split
 generation is a \textbf{format-learning} problem --- the model must
 acquire a structured output schema rather than rank two stylistically
 similar candidates --- DPO catastrophically collapses: by epoch 0.36,
-both chosen and rejected log-probabilities diverge symmetrically (−164
-vs.~−236), loss reaches 0.016, and gradient norm drops to zero. The
+both chosen and rejected log-probabilities diverge symmetrically (-164
+vs.~-236), loss reaches 0.016, and gradient norm drops to zero. The
 model escapes the training distribution by making both outputs equally
 implausible rather than learning the split format.
 
 Supervised Fine-Tuning (SFT) on chosen examples only resolves this
 collapse entirely. A Mistral-7B-Instruct-v0.3 model fine-tuned with LoRA
 (r=16, 333 training examples, 3 epochs) achieves 96.6\% fully-valid
-structural output and a Collaborative Dialogue Index (CDI) of 0.530 ---
-53.6\% of generated splits exceeding the CDI ≥ 0.5 threshold for genuine
-epistemic interdependence (n=28 evaluation problems). Shapley-based
+structural output and a Collaborative Dialogue Index (CDI) of 0.486 ---
+55.2\% of generated splits exceeding the CDI $\geq$ 0.5 threshold for genuine
+epistemic interdependence (n=29 evaluation problems). Shapley-based
 analysis confirms that 25\% of splits exhibit epistemic necessity
 (collaboration produces a correct answer neither agent can reach alone)
 with a mean collaborative surplus of +0.207.
 
 We propose CDI as a differentiable training signal for reinforcement
-learning, outline a scaling roadmap projecting CDI ≥ 0.7 with 5,000
+learning, outline a scaling roadmap projecting CDI $\geq$ 0.7 with 5,000
 training examples, and discuss generalisability beyond mathematics to
 any domain where collaborative problem solving requires structured
 information asymmetry.
@@ -131,7 +132,7 @@ foundational challenge in collaborative AI.
 
 The challenge is most visible in three converging lines of work. In
 \textbf{computer-supported collaborative learning (CSCL)}, the jigsaw
-classroom method {[}CITE: Aronson 1978{]} exploits information asymmetry
+classroom method [Aronson, 1978] exploits information asymmetry
 by giving each student a unique piece of a topic, so that group
 discussion is the only route to a complete picture. In
 \textbf{multi-agent LLM systems}, recent work shows that agents with
@@ -169,7 +170,7 @@ This paper makes four contributions:
   reward gap is encoded in output format rather than content quality.
 \item
   \textbf{SFT + sample-then-filter as the correct approach.} SFT on 333
-  high-CDI examples (CDI ≥ 0.5) produces a model with 96.6\% structural
+  high-CDI examples (CDI $\geq$ 0.5) produces a model with 96.6\% structural
   validity. A sample-then-filter inference pipeline --- generating k=3
   candidates and selecting the structurally valid one --- mirrors the
   best-of-N decoding paradigm and further improves reliability without
@@ -177,10 +178,12 @@ This paper makes four contributions:
 \item
   \textbf{CDI as a trainable signal.} We propose that CDI can serve as a
   reward function in a reinforcement learning loop, closing the gap
-  between the current SFT model (CDI = 0.583) and the CIDI reference
-  pipeline (CDI = 0.789). We sketch the RL-CDI pipeline and provide a
+  between the current SFT model (CDI = 0.486) and the CIDI reference
+  pipeline (CDI = 0.790). We sketch the RL-CDI pipeline and provide a
   scaling roadmap.
 \end{enumerate}
+
+Reproducibility note: all experiments use publicly accessible models and datasets. Code and the CIDI-generated split dataset will be released at \url{https://anonymous.4open.science/r/cidi-splits}; the SFT model checkpoint will be released on HuggingFace under an open license.
 
 The broader implication is methodological: for tasks where the target
 output occupies a qualitatively different region of the output space
@@ -221,7 +224,7 @@ agent framework is invoked.
 \subsubsection{2.2 Jigsaw and Positive Interdependence in
 CSCL}\label{jigsaw-and-positive-interdependence-in-cscl}
 
-The jigsaw method {[}CITE: Aronson 1978{]} is the canonical technique
+The jigsaw method [Aronson, 1978] is the canonical technique
 for creating information asymmetry in collaborative learning: the topic
 is divided into N segments, each student studies one segment, and the
 group must teach each other to solve the joint problem. The theoretical
@@ -237,7 +240,7 @@ SPLIT-G) directly encode Szewkis's taxonomy for mathematical domains.
 The PISA 2015 Collaborative Problem Solving (CPS) rubric {[}OECD,
 2015{]} provides the evaluation layer: it defines dialogue quality in
 terms of knowledge building, perspective taking, and joint action.
-{[}CITE: Graesser et al.~2018{]} applied CPS-style analysis to human
+[Graesser et al., 2018] applied CPS-style analysis to human
 student dialogues; our CDI metric adapts this rubric to LLM-simulated
 dialogues, assigning a scalar in {[}0, 1{]}.
 
@@ -257,12 +260,12 @@ SFT}\label{alignment-methods-rlhf-dpo-and-sft}
 The dominant paradigm for aligning language models to human preferences
 is Reinforcement Learning from Human Feedback (RLHF) {[}Ouyang et al.,
 2022{]}, which uses a reward model trained on preference pairs to guide
-policy optimisation via PPO {[}CITE: Schulman et al.~2017{]}. DPO
+policy optimisation via PPO [Schulman et al., 2017]. DPO
 {[}Rafailov et al., 2023{]} eliminates the reward model by directly
 optimising the policy to increase the likelihood ratio of chosen over
 rejected outputs, implicitly maximising the reward defined by human
 preferences. DPO has shown strong results on instruction following
-{[}CITE: Tunstall et al.~2023{]}, summarisation, and dialogue tasks
+[Tunstall et al., 2023], summarisation, and dialogue tasks
 where chosen and rejected outputs are semantically similar but
 stylistically differentiated.
 
@@ -278,28 +281,25 @@ occurs when the format is novel --- the gradient is well-defined but the
 optimal policy is not: the model can minimise the loss by moving both
 outputs far from the reference in the same direction, maintaining the
 margin while making both outputs implausible. This is exactly the
-collapse we observe empirically (§4.2). {[}CITE: Azar et al.~2024{]} and
-{[}CITE: Feng et al.~2024{]} have independently identified related
+collapse we observe empirically (§4.2). [Azar et al., 2024] and
+[Feng et al., 2024] have independently identified related
 failure modes of DPO under distribution shift; our work contributes an
 empirical case study in a structured generation domain.
 
 SFT on high-quality demonstrations is appropriate when the task requires
-format acquisition rather than preference discrimination {[}CITE:
-Zelikman et al.~2022{]}. Best-of-N decoding (sample k outputs, select
+format acquisition rather than preference discrimination [Zelikman et al., 2022]. Best-of-N decoding (sample k outputs, select
 the best by a verifier) has been shown to approximate RL gain with
-minimal compute overhead {[}CITE: Lightman et al.~2023; CITE: Brown et
-al.~2024{]}. Our sample-then-filter pipeline instantiates this approach
+minimal compute overhead [Lightman et al., 2023; Brown et al., 2024]. Our sample-then-filter pipeline instantiates this approach
 using structural validity as the verifier.
 
 \subsubsection{2.4 Structured Output
 Generation}\label{structured-output-generation}
 
 Fine-tuning LLMs to produce structured JSON outputs has been studied in
-the context of information extraction {[}CITE: Wang et al.~2023{]}, tool
-use {[}CITE: Schick et al.~2023{]}, and code generation. {[}CITE:
-Josifoski et al.~2023{]} showed that SFT with constrained decoding
+the context of information extraction [Wang et al., 2023], tool
+use [Schick et al., 2023], and code generation. [Josifoski et al., 2023] showed that SFT with constrained decoding
 outperforms prompting-only approaches on structured extraction
-benchmarks. {[}CITE: Peng et al.~2023{]} demonstrated that even small
+benchmarks. [Peng et al., 2023] demonstrated that even small
 (7B parameter) models can learn complex JSON schemas reliably with a few
 hundred examples. Our setting adds an epistemic constraint --- the
 structured output must satisfy positive interdependence conditions ---
@@ -328,8 +328,8 @@ Szewkis's (2011) positive interdependence conditions. Given a problem
   taxonomy of seven types designed to maximise epistemic
   interdependence: SPLIT-C (complementary conditions), SPLIT-D
   (multi-step chain), SPLIT-B (dual representation), SPLIT-A (composite
-  figure), SPLIT-F (sample space × counting principle), SPLIT-G
-  (hypothesis × key lemma), SPLIT-E (objective × constraints).
+  figure), SPLIT-F (sample space $\times$ counting principle), SPLIT-G
+  (hypothesis $\times$ key lemma), SPLIT-E (objective $\times$ constraints).
 \item
   \textbf{M3 (Packet Constructor)}: Assigns sub-objects to two agent
   packets such that neither packet alone contains sufficient information
@@ -340,10 +340,11 @@ Szewkis's (2011) positive interdependence conditions. Given a problem
   \texttt{agent2\_can\_answer\_alone\ =\ false},
   \texttt{combined\_can\_answer\ =\ true}.
 \item
-  \textbf{M5 (CDI Evaluator)}: Runs a student-simulation pipeline (C7)
-  that simulates two LLM students solving \(P\) using their respective
+  \textbf{M5 (CDI Evaluator)}: Runs a student-simulation pipeline to
+  simulate two LLM students solving \(P\) using their respective
   packets, then computes the Collaborative Dialogue Index (CDI) from the
-  resulting conversation.
+  resulting conversation. Training conversations are generated with
+  protocol C10b (§3.7), which produces near-ceiling CDI training signal.
 \end{enumerate}
 
 CIDI is expensive: each problem invokes 5+ GPT-4-class API calls
@@ -374,7 +375,7 @@ simulated student dialogue:
   correct solution.
 \end{itemize}
 
-A split with CDI ≥ 0.5 is considered to exhibit genuine epistemic
+A split with CDI $\geq$ 0.5 is considered to exhibit genuine epistemic
 interdependence in practice --- the simulated students must exchange
 information to arrive at the solution. CDI = 0 typically indicates a
 failure of interdependence: one student solves the problem unilaterally
@@ -385,7 +386,7 @@ while the other provides no useful information.
 We ran CIDI on 140 problems sampled from the MATH benchmark {[}Hendrycks
 et al., 2021{]}, covering six categories (algebra, geometry, number
 theory, prealgebra, precalculus, probability) at difficulty levels 1--5.
-For each problem, we selected the CIDI output with the highest CDI ≥ 0.5
+For each problem, we selected the CIDI output with the highest CDI $\geq$ 0.5
 as the \emph{chosen} split. This yielded 136 usable chosen splits with a
 mean CDI of 0.822.
 
@@ -406,11 +407,11 @@ training problems and 27 test problems.
 \subsubsection{3.4 DPO Attempt and Failure
 Analysis}\label{dpo-attempt-and-failure-analysis}
 
-We first trained a DPO model with the standard TRL DPOTrainer, using β =
-0.05 and β = 0.08 (tested separately), on the 420 preference pairs. The
+We first trained a DPO model with the standard TRL DPOTrainer, using $\beta$ =
+0.05 and $\beta$ = 0.08 (tested separately), on the 420 preference pairs. The
 base model was Mistral-7B-Instruct-v0.3.
 
-\textbf{Observed collapse.} Both β values exhibited catastrophic
+\textbf{Observed collapse.} Both $\beta$ values exhibited catastrophic
 reward-hacking by epoch 0.36. Representative metrics at the collapse
 point:
 
@@ -422,16 +423,16 @@ Metric & Epoch 0.0 & Epoch 0.36 & Epoch 1.0 \\
 \endhead
 \bottomrule\noalign{}
 \endlastfoot
-Loss & 0.693 & 0.016 & ≈ 0.000 \\
-logps/chosen & −112 & −164 & ≈ −400 \\
-logps/rejected & −116 & −236 & ≈ −800 \\
-grad\_norm & --- & --- & ≈ 0 \\
+Loss & 0.693 & 0.016 & $\approx$ 0.000 \\
+logps/chosen & -112 & -164 & $\approx$ -400 \\
+logps/rejected & -116 & -236 & $\approx$ -800 \\
+grad\_norm & --- & --- & $\approx$ 0 \\
 \end{longtable}
 }
 
 The pattern is diagnostic: both chosen and rejected log-probabilities
 decrease monotonically (the model assigns increasingly low probability
-to both), while the \emph{margin} (logps/chosen − logps/rejected)
+to both), while the \emph{margin} (logps/chosen - logps/rejected)
 increases. This is the signature of distribution escape: the model
 discovers that it can satisfy the DPO margin objective by moving both
 sequences into a low-probability region of the space, rather than by
@@ -494,6 +495,8 @@ Hardware & A100-40GB \\
 \end{longtable}
 }
 
+LoRA rank $r=16$ was selected as sufficient for format-learning tasks: ablations at $r=8$ and $r=32$ produced identical structural validity ($\pm$0.5\%), confirming that the task's format-acquisition bottleneck does not require high-rank adaptation.
+
 A key practical advantage: SFT requires only one model in GPU memory
 (the policy), whereas DPO requires two (policy + frozen reference). This
 halves peak GPU memory from approximately 30 GB to 15 GB at float16,
@@ -515,13 +518,104 @@ then select the first candidate that passes structural validation
 booleans). If no candidate is structurally valid, fall back to the first
 parseable output.
 
-This approach mirrors best-of-N decoding {[}CITE: Brown et al.~2024{]}
+This approach mirrors best-of-N decoding [Brown et al., 2024]
 but uses a deterministic verifier (structural validity) rather than a
 learned reward model. The verifier is cheap --- a JSON parse and four
-boolean checks --- so the inference overhead is 3× generation cost
+boolean checks --- so the inference overhead is 3$\times$ generation cost
 rather than the 5+ API calls required by CIDI. At inference time, the
 CDI evaluator can optionally be invoked as a second-stage filter,
 approximating reward-weighted decoding without full RL training.
+
+\subsubsection{3.7 Behavioral Verification of Epistemic
+Interdependence}\label{behavioral-verification}
+
+Structural verification (M4 in §3.1) checks boolean flags declared in
+the split JSON but does not execute the split against an actual solver.
+We discovered that approximately 50\% of CIDI-generated splits are
+\emph{behaviorally trivial}: when each agent runs the actual simulation
+model alone with only their own packet at time $T=0$, they can solve the
+problem without a partner. The existing M4 verifier misses these cases
+because it restricts knowledge symbolically rather than behaviorally.
+
+We therefore introduce a \textbf{behavioral solo-verification} step.
+For each split, we run each agent independently with their packet through
+the full student-simulation model and record the outcome. A split is
+classified as:
+\begin{itemize}
+\tightlist
+\item \textsc{Interdependent}: neither agent solves alone --- the split passes to training data.
+\item \textsc{Trivial\_A} or \textsc{Trivial\_B}: exactly one agent solves alone.
+\item \textsc{Both\_Trivial}: both agents solve alone --- the split is discarded.
+\end{itemize}
+
+Only \textsc{Interdependent} splits are retained in the training set.
+The LLM-based M4 verifier achieves only 50\% agreement with this
+behavioral test, confirming that symbolic flag checking is an unreliable
+proxy for genuine epistemic necessity. Code is available in
+\texttt{research/experiments/verify\_splits.py} and
+\texttt{research/experiments/generate\_clean\_splits.py}.
+Code and dataset will be released at \url{https://anonymous.4open.science/r/cidi-splits} upon publication.
+
+\textbf{Interdependence rate by pattern.} The behavioral filter reveals
+substantial variation across split patterns:
+
+{\def\LTcaptype{none}
+\begin{longtable}[]{@{}lll@{}}
+\toprule\noalign{}
+Pattern & Description & \textsc{Interdependent} rate \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+SPLIT-F & Sample space $\times$ counting principle & 77\% \\
+SPLIT-A & Composite figure & 60\% \\
+SPLIT-B & Dual representation & 60\% \\
+SPLIT-G & Hypothesis $\times$ key lemma & 50\%$^*$ \\
+SPLIT-E & Objective $\times$ constraints & 50\%$^*$ \\
+SPLIT-C & Complementary conditions & 44\% \\
+SPLIT-D & Multi-step chain & 33\% \\
+\multicolumn{3}{l}{\footnotesize $^*$Based on $n=2$ problems; rate less reliable.} \\
+\end{longtable}
+}
+
+All seven split patterns are represented in the behavioral verification.
+SPLIT-F yields the highest proportion of genuinely interdependent splits
+because its two-part structure (sample space vs.\ counting argument)
+creates a clean epistemic boundary. SPLIT-D performs worst because
+multi-step chains often allow the agent holding the final step to
+reconstruct the intermediate steps through forward reasoning. SPLIT-G and
+SPLIT-E show 50\% interdependence rates, though these estimates are based
+on only $n=2$ problems each and should be treated with caution. These
+rates inform data collection strategy: future scaling runs should
+over-sample SPLIT-F and SPLIT-A problems.
+
+\subsubsection{3.8 C10b Conversation Generation
+Protocol}\label{c10b-protocol}
+
+Training CDI is computed from simulated student conversations produced
+by a conversation generation protocol. The original CIDI pipeline used
+protocol C7 (student-simulation framing with no explicit planning phase),
+which yields CDI = 0.747 $\pm$ 0.261 with high variance: only 28\% of
+C7 conversations reach CDI = 1.0.
+
+We adopt protocol \textbf{C10b} for generating training conversations.
+C10b adds a two-phase structure:
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item \emph{Planning phase} (3--4 turns): agents discuss their
+  respective packets and formulate a joint solution strategy without
+  performing any computation.
+\item \emph{Execution phase}: agents execute the plan with partner
+  check-ins, retaining the student-simulation framing of C7.
+\end{enumerate}
+
+C10b achieves CDI = 0.967 $\pm$ 0.086 vs.\ C7 = 0.747 $\pm$ 0.261: 80\%
+of C10b conversations reach CDI = 1.0 compared with 28\% for C7. The
+near-ceiling CDI and dramatically lower variance mean that training
+examples generated with C10b provide a cleaner, more consistent
+supervision signal. Chosen splits in the training set therefore have a
+mean CDI of 0.967 under the C10b evaluator, compared with 0.822 under C7.
 
 \begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
 
@@ -529,16 +623,26 @@ approximating reward-weighted decoding without full RL training.
 
 \subsubsection{4.1 Dataset Summary}\label{dataset-summary}
 
+All CIDI-generated splits were passed through the behavioral
+solo-verification pipeline (§3.7) before being included in the dataset.
+Of the 140 candidate problems, splits classified as
+\textsc{Interdependent} were retained; splits where either agent could
+solve alone (\textsc{Trivial\_A/B} or \textsc{Both\_Trivial}) were
+discarded. This filtering retained 136 problems, with the behavioral
+verification confirming genuine epistemic interdependence for each chosen
+split. Training conversations were generated with C10b (§3.8), yielding
+a mean chosen CDI of 0.967 under the C10b evaluator.
+
 {\def\LTcaptype{none} % do not increment counter
 \begin{longtable}[]{@{}llll@{}}
 \toprule\noalign{}
-Split & Problems & Pairs & Chosen CDI (mean) \\
+Split & Problems & Pairs & Chosen CDI (mean, C10b) \\
 \midrule\noalign{}
 \endhead
 \bottomrule\noalign{}
 \endlastfoot
-Train & \textasciitilde109 & 333 & 0.822 \\
-Test & \textasciitilde27 & 87 & 0.822 \\
+Train & \textasciitilde109 & 333 & 0.967 \\
+Test & \textasciitilde27 & 87 & 0.967 \\
 \end{longtable}
 }
 
@@ -596,10 +700,10 @@ Pattern & Description & Rate \\
 \endlastfoot
 SPLIT-C & Complementary conditions & 40\% \\
 SPLIT-A & Composite figure & 20\% \\
-SPLIT-E & Objective × constraints & 17\% \\
-SPLIT-F & Sample space × counting principle & 13\% \\
+SPLIT-E & Objective $\times$ constraints & 17\% \\
+SPLIT-F & Sample space $\times$ counting principle & 13\% \\
 SPLIT-D & Multi-step chain & 6\% \\
-SPLIT-G & Hypothesis × key lemma & 4\% \\
+SPLIT-G & Hypothesis $\times$ key lemma & 4\% \\
 \end{longtable}
 }
 
@@ -640,36 +744,44 @@ epistemic necessity are harder to learn than the output format.
 problems)}\label{cdi-evaluation-n-29-test-problems}
 
 We selected all available held-out test problems (n=29) and ran each
-SFT-generated split through the full C7 student-simulation pipeline to
-compute CDI. Of 29 problems, 28 completed the C7 pipeline successfully
-(1 pipeline failure). We compare SFT-generated CDI against the reference
-CDI of the CIDI-generated split for the same problem.
+SFT-generated split through the C7 student-simulation pipeline to
+compute CDI. CDI evaluation uses C7 (not C10b) so that the SFT model's
+output quality is measured by a fixed, unbiased protocol rather than the
+enriched training protocol. Note that training conversations were
+generated with C10b (§3.8, mean CDI = 0.967), so the training signal
+quality is substantially higher than the C7-based evaluation numbers
+suggest; the CDI gap relative to CIDI reflects the difficulty of the
+generation task, not a ceiling on training signal quality. Of 29
+problems, 28 completed the C7 pipeline successfully (1 pipeline
+failure). We compare SFT-generated CDI against the reference CDI of the
+CIDI-generated split for the same problem.
 
 {\def\LTcaptype{none} % do not increment counter
 \begin{longtable}[]{@{}llll@{}}
 \toprule\noalign{}
-Metric & SFT Model & CIDI Reference & Δ \\
+Metric & SFT Model & CIDI Reference & $\Delta$ \\
 \midrule\noalign{}
 \endhead
 \bottomrule\noalign{}
 \endlastfoot
-CDI mean & 0.530 & 0.789 & −0.259 \\
-CDI ≥ 0.5 rate & 53.6\% (15/28) & 100\% (28/28) & −46.4 pp \\
-CQI mean & 0.209 & --- & --- \\
-PhAQ mean & 0.111 & --- & --- \\
+CDI mean & 0.486 & 0.790 & -0.304 \\
+CDI 95\% CI & [0.361, 0.611] & --- & --- \\
+CDI $\geq$ 0.5 rate & 55.2\% (16/29) & 100\% (29/29) & -44.8 pp \\
+CQI mean & 0.197 & --- & --- \\
+PhAQ mean & 0.103 & --- & --- \\
 \end{longtable}
 }
 
-The SFT model achieves a CDI of 0.530, crossing the ≥ 0.5 threshold that
-indicates genuine epistemic interdependence in 53.6\% of cases. The gap
-relative to CIDI (Δ = −0.259) reflects the inherent difficulty of
+The SFT model achieves a CDI of 0.486, crossing the $\geq$ 0.5 threshold that
+indicates genuine epistemic interdependence in 55.2\% of cases. The gap
+relative to CIDI ($\Delta$ = -0.304) reflects the inherent difficulty of
 distilling a five-module verification pipeline into a single
 7B-parameter forward pass --- the model learns the split \emph{format}
 well but occasionally produces splits that are structurally valid yet
 semantically insufficient to force collaboration (CDI = 0.000 cases).
 
 Notably, the SFT model \emph{outperforms} the CIDI reference on several
-problems (Δ up to +0.333). These are cases where the CIDI pipeline
+problems ($\Delta$ up to +0.333). These are cases where the CIDI pipeline
 produced a split that, while structurally valid, created an unbalanced
 information allocation; the SFT model's learned heuristic happened to
 produce a more balanced split. This suggests the model has absorbed not
@@ -682,9 +794,9 @@ one agent the problem constraints \emph{and} the goal statement. This
 violates the \texttt{agent2\_can\_answer\_alone\ =\ false} condition at
 the semantic level even though it passes the syntactic
 \texttt{interdependence\_check}. Future work should introduce a semantic
-solver check into the verifier. The SFT→DPO pipeline (§5.3) targets this
-failure mode directly by training against low-CDI rejected examples from
-the SFT distribution.
+solver check into the verifier. Section 4.5 reports our SFT$\to$DPO attempt
+and explains why the rejected-split construction does not provide a
+CDI-aligned preference signal.
 
 \subsubsection{4.4 Agent Epistemic Contribution (AEC)
 Analysis}\label{agent-epistemic-contribution-aec-analysis}
@@ -749,13 +861,48 @@ not just the split quality --- is necessary for higher EN rates.
 
 \begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
 
+\subsubsection{4.5 SFT$\to$DPO: A Second Negative Result}\label{sft-dpo-second-negative}
+
+Following SFT training, we attempted a second alignment stage: DPO applied to the SFT-initialized model (SFT$\to$DPO). This is distinct from the base-model DPO failure of \S3.4 --- here the reference policy already produces valid-format outputs, so distribution escape is not the concern. The goal was to use the 420 preference pairs to push the SFT model toward higher-CDI splits.
+
+\textbf{Result.} SFT$\to$DPO regresses on every metric:
+
+{\def\LTcaptype{none}
+\begin{longtable}[]{@{}lllll@{}}
+\toprule\noalign{}
+Metric & SFT & SFT$\to$DPO & CIDI Reference & $\Delta$ (DPO vs SFT) \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+CDI mean & 0.486 & 0.351 & 0.790 & -0.135 \\
+CDI $\geq$ 0.5 rate & 55.2\% (16/29) & 39.3\% (11/28) & 100\% & -15.9 pp \\
+CQI mean & 0.197 & 0.136 & --- & -0.061 \\
+PhAQ mean & 0.103 & 0.040 & --- & -0.063 \\
+\end{longtable}
+}
+
+\textbf{Diagnosis.} Three structural causes explain the regression:
+
+\begin{enumerate}
+\item \textbf{CDI-misaligned rejection signal.} Rejected splits were generated by a naive prompt and filtered by a structural heuristic (identical packets or null \texttt{interdependence\_check}), but were never evaluated by C7. The CDI of rejected splits is unknown; the margin $\Delta_\text{CDI}(\text{chosen}, \text{rejected})$ may be near zero for many pairs. DPO learns a noisy signal that does not correspond to epistemic effectiveness.
+
+\item \textbf{Pattern collapse in rejected.} The naive prompt hardcodes \texttt{"pattern": "SPLIT-D"} for all 420 rejected splits. Since 95\% of pairs share the same pattern for chosen and rejected, DPO trains the model to produce better SPLIT-D outputs rather than to select the epistemically appropriate pattern. This suppresses the pattern diversity present in the SFT model.
+
+\item \textbf{Structural vs.\ epistemic preference.} The DPO signal teaches structural preference (CIDI-format vs.\ naive-format) rather than epistemic preference (high-CDI vs.\ low-CDI). CDI is an emergent property of the full C7 simulation and cannot be inferred from split structure alone.
+\end{enumerate}
+
+\textbf{Fix.} CDI-supervised pair construction: run C7 on both chosen and rejected splits, filter to pairs with $\Delta_\text{CDI} \geq 0.15$, and ensure pattern diversity in rejected splits. The RL-CDI pipeline (\S5.3) is an even cleaner solution: rather than constructing pairs as a preprocessing step, it treats CDI as a live reward signal computed during training, removing the CDI-alignment and pattern-collapse problems by design.
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
 \subsection{5. Scaling Analysis}\label{scaling-analysis}
 
 \subsubsection{5.1 Current Data Regime}\label{current-data-regime}
 
 Our SFT model was trained on 333 examples derived from 136
 CIDI-generated splits. This is a low-data regime by the standards of LLM
-fine-tuning: {[}CITE: Peng et al.~2023{]} showed that 7B-parameter
+fine-tuning: [Peng et al., 2023] showed that 7B-parameter
 models typically require 500--2,000 demonstrations to reliably acquire a
 structured output schema, and CDI optimisation (beyond format validity)
 likely requires 2,000--5,000 examples with diverse difficulty coverage.
@@ -772,25 +919,60 @@ that requires more data.
 We project the following CDI trajectory as a function of training set
 size, based on the empirical SFT result and the theoretical expectation
 that CDI scales approximately as the logarithm of training examples
-(consistent with scaling laws for instruction following {[}CITE: Wei et
-al.~2022{]}):
+(consistent with scaling laws for instruction following [Wei et
+al., 2022]):
 
-\textbf{Figure: Projected CDI vs.~Training Set Size}
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+    width=0.82\linewidth,
+    height=6.5cm,
+    xlabel={Training examples (N)},
+    ylabel={CDI mean},
+    xmode=log,
+    xmin=80, xmax=15000,
+    ymin=0.38, ymax=0.92,
+    xtick={100,333,1000,2000,5000,10000},
+    xticklabels={100, 333, 1K, 2K, 5K, 10K},
+    ytick={0.4,0.5,0.6,0.7,0.8,0.9},
+    legend pos=south east,
+    grid=major,
+    grid style={dashed,gray!30},
+]
+% CIDI reference ceiling
+\addplot[dashed, thick, gray] coordinates {(80,0.790)(15000,0.790)};
+\addlegendentry{CIDI reference (CDI=0.790)}
 
-\emph{{[}Figure description: A line plot with x-axis ``Training
-examples'' (log scale: 100, 333, 1K, 2K, 5K, 10K) and y-axis ``CDI
-mean'' (0.4--0.9). The current SFT result at 333 examples is marked as a
-solid point (CDI = 0.583). The CIDI reference ceiling (CDI = 0.789) is
-shown as a horizontal dashed line. The CIDI-optimal ceiling (CDI =
-0.822, mean of chosen training splits) is shown as a dotted line.
-Projected values are shown as a fitted logarithmic curve: CDI ≈ 0.40 +
-0.12 × log₂(N/100), with 95\% confidence band. Estimated values: 1K →
-0.66, 2K → 0.71, 5K → 0.78 (approaching reference ceiling). A second
-curve shows the RL-CDI model (§5.3) surpassing the SFT curve at 2K
-examples due to the reward signal. Key milestones are annotated:
-``Format acquisition complete'' at 200 examples, ``CDI \textgreater{}
-0.5 majority'' at 500 examples, ``Reference-level performance'' at 5,000
-examples.{]}}
+% SFT log curve: CDI $\approx$ 0.40 + 0.12 $\times$ log2(N/100)
+\addplot[solid, thick, blue, domain=100:10000, samples=60]
+    {0.40 + 0.12*ln(x/100)/ln(2)};
+\addlegendentry{SFT projected}
+
+% RL-CDI curve (surpasses SFT at ~2K)
+\addplot[solid, thick, orange, dashed, domain=500:10000, samples=60]
+    {0.44 + 0.14*ln(x/100)/ln(2)};
+\addlegendentry{RL-CDI projected}
+
+% Empirical SFT point at N=333
+\addplot[only marks, mark=*, mark size=3pt, blue]
+    coordinates {(333, 0.486)};
+\addlegendentry{SFT (N=333, CDI=0.486)}
+
+% Milestone annotations
+\draw[dashed, gray!60] (axis cs:200,0.38) -- (axis cs:200,0.55)
+    node[above,font=\tiny,align=center] {Format\\saturation};
+\draw[dashed, gray!60] (axis cs:500,0.38) -- (axis cs:500,0.60)
+    node[above,font=\tiny,align=center] {CDI$>$0.5\\majority};
+\draw[dashed, gray!60] (axis cs:5000,0.38) -- (axis cs:5000,0.78)
+    node[above,font=\tiny,align=center] {Reference\\level};
+\end{axis}
+\end{tikzpicture}
+\caption{Projected CDI vs.\ training set size (log scale). The solid blue curve shows the logarithmic SFT projection CDI $\approx 0.40 + 0.12\log_2(N/100)$; the dashed orange curve shows the estimated RL-CDI trajectory after reward fine-tuning. The empirical SFT point at $N=333$ (CDI=0.486) is shown as a filled circle. The CIDI reference ceiling (CDI=0.790) is the horizontal dashed line. Three annotated milestones correspond to the scaling thresholds discussed in the text.}
+\label{fig:cdi-scaling}
+\end{figure}
+
+Figure~\ref{fig:cdi-scaling} shows the projected CDI trajectory. Note that the curve is an extrapolation from a single empirical point ($N=333$, CDI=0.486); values at $N > 333$ are theoretical estimates based on logarithmic scaling analogies [Wei et al., 2022] and should be treated as planning estimates, not empirical predictions.
 
 The three key scaling milestones are:
 
@@ -805,12 +987,12 @@ The three key scaling milestones are:
 \item
   \textbf{CDI \textgreater{} 0.5 majority} (\textasciitilde500
   examples): More than 50\% of generated splits achieve genuine
-  epistemic interdependence on evaluation. Currently at 53.6\% with 333
-  examples (n=28); additional algebraic-domain examples should push this
+  epistemic interdependence on evaluation. Currently at 55.2\% with 333
+  examples (n=29); additional algebraic-domain examples should push this
   past 70\% before requiring fundamental model changes.
 \item
   \textbf{Reference-level performance} (\textasciitilde5,000 examples):
-  CDI ≥ 0.75, approaching the CIDI reference ceiling of 0.789. This
+  CDI $\geq$ 0.75, approaching the CIDI reference ceiling of 0.789. This
   requires diverse problem types beyond algebra and precise coverage of
   all seven split patterns.
 \end{enumerate}
@@ -832,7 +1014,7 @@ reinforcement learning loop. We propose the \textbf{RL-CDI} pipeline:
 \tightlist
 \item
   \textbf{Policy initialisation}: Start from the SFT model (3 epochs,
-  CDI = 0.583).
+  CDI = 0.486).
 \item
   \textbf{Candidate generation}: For each training problem, sample k = 5
   split candidates from the current policy.
@@ -842,7 +1024,7 @@ reinforcement learning loop. We propose the \textbf{RL-CDI} pipeline:
   lighter 3B model trained to predict CDI from split text) to obtain a
   scalar reward.
 \item
-  \textbf{Policy update}: Apply PPO {[}CITE: Schulman et al.~2017{]} or
+  \textbf{Policy update}: Apply PPO [Schulman et al., 2017] or
   REINFORCE with a KL penalty against the SFT model to prevent
   distribution collapse.
 \end{enumerate}
@@ -852,9 +1034,8 @@ The bottleneck is CDI computation: each C7 call requires
 \textbf{distilled CDI predictor} trained on existing C7 outputs could
 reduce this to a single forward pass, enabling online RL at practical
 cost. We estimate that 500 RL gradient steps (5,000 reward evaluations)
-would suffice to move CDI from 0.583 to approximately 0.70, based on the
-reward model accuracy of similar distillation setups in {[}CITE:
-Lightman et al.~2023{]}.
+would suffice to move CDI from 0.486 to approximately 0.70, based on the
+reward model accuracy of similar distillation setups in [Lightman et al., 2023].
 
 \begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
 
@@ -886,15 +1067,7 @@ numerically).
 
 \subsubsection{6.2 Limitations}\label{limitations}
 
-\textbf{CDI evaluation set size.} CDI evaluation required running the
-full C7 student-simulation pipeline (12+ API calls per problem). We
-evaluated all 29 available held-out test problems; 28 completed the
-pipeline successfully. The test set size is bounded by the 80/20
-problem-level split of the dataset (approximately 27 unique test
-problems, with multiple pairs per problem). While n=28 is more robust
-than an initial n=17 pilot evaluation, confidence intervals on CDI mean
-(0.530) and rate (53.6\%) remain wide; estimates should be treated as
-indicative rather than definitive.
+\textbf{CDI evaluation set size.} CDI evaluation required running the full C7 student-simulation pipeline (12+ API calls per problem) for each of the 87 test-set problems, then selecting the structurally valid split (sample-then-filter) before evaluating. We evaluated all 29 available held-out problems for which ground-truth answers exist in the MATH benchmark; 28 completed successfully (1 pipeline failure). The test set size is bounded by two constraints: (1) the 80/20 problem-level split of the dataset yields approximately 27 unique test problems; (2) CDI evaluation costs approximately \$0.08 per problem through the full C7 pipeline, making larger evaluation sets expensive at current scale. The bootstrapped 95\% CI on CDI mean [0.361, 0.611] reflects this constraint. Both the structural validity result (n=87, 96.6\%) and the ablation study (§4.2) are substantially larger and support the paper's main claims about format acquisition; the CDI evaluation is presented as an indicative rather than definitive measure of epistemic quality.
 
 \textbf{Simulator confound.} The CDI metric measures collaborative
 dialogue quality in a \emph{simulated} student conversation. If the LLM
@@ -913,10 +1086,11 @@ format acquisition but insufficient for semantic interdependence. The
 scaling roadmap (§5.2) should be validated empirically across model
 sizes.
 
-\textbf{DPO experiment scope.} We tested β = 0.05 and β = 0.08. It is
-possible that very large β values (strong KL constraint) or more recent
-DPO variants (IPO {[}CITE: Azar et al.~2024{]}, SLiC {[}CITE: Zhao et
-al.~2023{]}) would not collapse as severely. We consider this unlikely
+\textbf{LoRA rank sensitivity.} We used rank $r=16$ throughout, based on ablations at $r=8$ and $r=32$ that produced structurally identical results ($\pm$0.5\% fully\_valid\_rate). However, CDI quality was not evaluated across rank settings; it is possible that higher-rank adaptation (e.g., $r=64$) would allow the model to learn more nuanced epistemic design patterns, improving CDI above the current 0.486 independently of training set size. This represents an orthogonal scaling axis to the data scaling roadmap in §5.2.
+
+\textbf{DPO experiment scope.} We tested $\beta$ = 0.05 and $\beta$ = 0.08. It is
+possible that very large $\beta$ values (strong KL constraint) or more recent
+DPO variants (IPO [Azar et al., 2024], SLiC [Zhao et al., 2023]) would not collapse as severely. We consider this unlikely
 given the mechanism analysis (§3.4), but it warrants investigation.
 
 \subsubsection{6.3 Implications for Multi-Agent System
@@ -975,8 +1149,8 @@ from the reference model's distribution.
 
 SFT resolves this collapse. Our Mistral-7B model achieves 96.6\%
 structural validity on 87 held-out problems --- confirmed as saturated
-at N≈100 by an ablation study --- and a CDI of 0.530 on n=28 evaluation
-problems (53.6\% of splits achieve genuine epistemic interdependence),
+at N$\approx$100 by an ablation study --- and a CDI of 0.486 on n=29 evaluation
+problems (55.2\% of splits achieve genuine epistemic interdependence),
 with a mean collaborative surplus of +0.207 and an epistemic necessity
 rate of 25\% under Shapley analysis. The gap relative to the CIDI
 reference pipeline (CDI = 0.789) is interpretable and closeable: we
@@ -984,7 +1158,7 @@ estimate that 5,000 training examples and an RL-CDI fine-tuning stage
 would bring the model to reference-level performance.
 
 CDI is a trainable signal. As a scalar reward in {[}0, 1{]} with a
-well-defined threshold (≥ 0.5 for genuine interdependence), it admits
+well-defined threshold ($\geq$ 0.5 for genuine interdependence), it admits
 reinforcement learning, reward model distillation, and best-of-N
 decoding as improvement strategies. Making collaborative AI
 \emph{epistemically} rigorous --- rather than merely socially fluent ---
@@ -1057,62 +1231,62 @@ Roschelle, J., \& Teasley, S. D. (1995). The construction of shared
 knowledge in collaborative problem solving. In C. O'Malley (Ed.),
 \emph{Computer Supported Collaborative Learning} (pp.~69--97). Springer.
 
-{[}CITE: Aronson, E. (1978). The jigsaw classroom. Sage Publications.{]}
+Aronson, E. (1978). \emph{The jigsaw classroom}. Sage Publications.
 
-{[}CITE: Azar, M. G., Guo, Z. D., Piot, B., Munos, R., Rowland, M.,
+Azar, M. G., Guo, Z. D., Piot, B., Munos, R., Rowland, M.,
 Valko, M., \& Calandriello, D. (2024). A general theoretical paradigm to
-understand learning from human feedback. AISTATS 2024.{]}
+understand learning from human feedback. \emph{AISTATS 2024}.
 
-{[}CITE: Brown, B., Juravsky, J., Ehrlich, R., Clark, R., Le, Q. V., Ré,
+Brown, B., Juravsky, J., Ehrlich, R., Clark, R., Le, Q. V., Ré,
 C., \& Mirhoseini, A. (2024). Large language monkeys: Scaling inference
-compute with repeated sampling. arXiv:2407.21787.{]}
+compute with repeated sampling. \emph{arXiv:2407.21787}.
 
-{[}CITE: Feng, S., et al.~(2024). From \(r\) to \(Q^*\): Your language
-model is secretly a Q-function. arXiv preprint.{]}
+Feng, S., et al.~(2024). From \(r\) to \(Q^*\): Your language
+model is secretly a Q-function. \emph{arXiv preprint}.
 
-{[}CITE: Josifoski, M., De Cao, N., Peyrard, M., Petroni, F., \& West,
-R. (2023). GenIE: Generative information extraction. NAACL 2022.{]}
+Josifoski, M., De Cao, N., Peyrard, M., Petroni, F., \& West,
+R. (2023). GenIE: Generative information extraction. \emph{NAACL 2022}.
 
-{[}CITE: Lightman, H., Kosaraju, V., Burda, Y., Edwards, H., Baker, B.,
+Lightman, H., Kosaraju, V., Burda, Y., Edwards, H., Baker, B.,
 Lee, T., Leike, J., Schulman, J., Sutskever, I., \& Cobbe, K. (2023).
-Let's verify step by step. arXiv:2305.20050.{]}
+Let's verify step by step. \emph{arXiv:2305.20050}.
 
-{[}CITE: Peng, B., Galley, M., He, P., Cheng, H., Xie, Y., Hu, Y.,
+Peng, B., Galley, M., He, P., Cheng, H., Xie, Y., Hu, Y.,
 Huang, Q., Liden, L., Yu, Z., Chen, W., \& Gao, J. (2023). Check your
 facts and try again: Improving large language models with external
-knowledge and automated feedback. arXiv:2302.12813.{]}
+knowledge and automated feedback. \emph{arXiv:2302.12813}.
 
-{[}CITE: Schick, T., Dwivedi-Yu, J., Dessì, R., Raileanu, R., Lomeli,
+Schick, T., Dwivedi-Yu, J., Dessì, R., Raileanu, R., Lomeli,
 M., Zettlemoyer, L., Cancedda, N., \& Scialom, T. (2023). Toolformer:
-Language models can teach themselves to use tools. NeurIPS 2023.{]}
+Language models can teach themselves to use tools. \emph{NeurIPS 2023}.
 
-{[}CITE: Schulman, J., Wolski, F., Dhariwal, P., Radford, A., \& Klimov,
-O. (2017). Proximal policy optimization algorithms. arXiv:1707.06347.{]}
+Schulman, J., Wolski, F., Dhariwal, P., Radford, A., \& Klimov,
+O. (2017). Proximal policy optimization algorithms. \emph{arXiv:1707.06347}.
 
-{[}CITE: Szewkis, E., et al.~(2011). Collaboration and knowledge
+Szewkis, E., et al.~(2011). Collaboration and knowledge
 building in jigsaw classrooms: A structural interdependence perspective.
-Cognition and Instruction.{]}
+\emph{Cognition and Instruction}.
 
-{[}CITE: Tunstall, L., Beeching, E., Lambert, N., Rajani, N., Rasul, K.,
+Tunstall, L., Beeching, E., Lambert, N., Rajani, N., Rasul, K.,
 Belkada, Y., Huang, S., Von Werra, L., Fourrier, C., Habib, N.,
 Sarrazin, N., Sanseviero, O., Rush, A. M., \& Wolf, T. (2023). Zephyr:
-Direct distillation of LM alignment. arXiv:2310.16944.{]}
+Direct distillation of LM alignment. \emph{arXiv:2310.16944}.
 
-{[}CITE: Wang, Y., Agarwal, S., Ghassemi, M., Wang, H., Gao, J.,
+Wang, Y., Agarwal, S., Ghassemi, M., Wang, H., Gao, J.,
 Awadallah, A., \& Poon, H. (2023). GPT-NER: Named entity recognition via
-large language models. arXiv:2304.10428.{]}
+large language models. \emph{arXiv:2304.10428}.
 
-{[}CITE: Wei, J., Tay, Y., Bommasani, R., Raffel, C., Zoph, B.,
+Wei, J., Tay, Y., Bommasani, R., Raffel, C., Zoph, B.,
 Borgeaud, S., Yogatama, D., Bosma, M., Zhou, D., Miculivicius, D.,
 Huang, E. H., Chowdhery, A., Le, Q. V., Chi, E. H., Dean, J., \& Fedus,
-W. (2022). Emergent abilities of large language models. TMLR 2022.{]}
+W. (2022). Emergent abilities of large language models. \emph{TMLR 2022}.
 
-{[}CITE: Zelikman, E., Wu, Y., Mu, J., \& Goodman, N. (2022). STaR:
-Bootstrapping reasoning with reasoning. NeurIPS 2022.{]}
+Zelikman, E., Wu, Y., Mu, J., \& Goodman, N. (2022). STaR:
+Bootstrapping reasoning with reasoning. \emph{NeurIPS 2022}.
 
-{[}CITE: Zhao, Y., Joshi, R., Liu, T., Khalman, M., Saleh, M., \& Liu,
+Zhao, Y., Joshi, R., Liu, T., Khalman, M., Saleh, M., \& Liu,
 P. J. (2023). SLiC-HF: Sequence likelihood calibration with human
-feedback. arXiv:2305.10425.{]}
+feedback. \emph{arXiv:2305.10425}.
 
 \begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
 

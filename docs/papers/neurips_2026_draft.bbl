@@ -1,0 +1,137 @@
+\begin{thebibliography}{23}
+\providecommand{\natexlab}[1]{#1}
+\providecommand{\url}[1]{\texttt{#1}}
+\expandafter\ifx\csname urlstyle\endcsname\relax
+  \providecommand{\doi}[1]{doi: #1}\else
+  \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
+
+\bibitem[Barron(2003)]{barron2003conditions}
+B.~Barron.
+\newblock When smart groups fail.
+\newblock \emph{Journal of the Learning Sciences}, 12\penalty0 (3):\penalty0 307--359, 2003.
+\newblock \doi{10.1207/S15327809JLS1203_1}.
+
+\bibitem[Chi et~al.(2001)Chi, Siler, Jeong, Yamauchi, and Hausmann]{chi2001learning}
+M.~T.~H. Chi, S.~A. Siler, H.~Jeong, T.~Yamauchi, and R.~G. Hausmann.
+\newblock Learning from human tutoring.
+\newblock \emph{Cognitive Science}, 25\penalty0 (4):\penalty0 471--533, 2001.
+\newblock \doi{10.1207/s15516709cog2504_1}.
+
+\bibitem[Dillenbourg(1999)]{dillenbourg1999collaborative}
+P.~Dillenbourg.
+\newblock What do you mean by collaborative learning?
+\newblock In P.~Dillenbourg, editor, \emph{Collaborative Learning: Cognitive and Computational Approaches}, pages 1--19. Pergamon/Elsevier, 1999.
+
+\bibitem[Du et~al.(2023)Du, Li, Torralba, Tenenbaum, and Mordatch]{du2023improving}
+Y.~Du, S.~Li, A.~Torralba, J.~B. Tenenbaum, and I.~Mordatch.
+\newblock Improving factuality and reasoning in language models through multiagent debate.
+\newblock arXiv preprint arXiv:2305.14325, 2023.
+
+\bibitem[Graesser et~al.(2017)Graesser, Kuo, and Liao]{graesser2017complex}
+A.~C. Graesser, B.-C. Kuo, and C.-H. Liao.
+\newblock Complex problem solving in assessments of collaborative problem solving.
+\newblock \emph{Journal of Intelligence}, 5\penalty0 (2):\penalty0 10, 2017.
+\newblock \doi{10.3390/jintelligence5020010}.
+
+\bibitem[Graesser et~al.(2018)Graesser, Fiore, Greiff, Andrews-Todd, Foltz, and Hesse]{graesser2018advancing}
+A.~C. Graesser, S.~M. Fiore, S.~Greiff, J.~Andrews-Todd, P.~W. Foltz, and F.~W. Hesse.
+\newblock Advancing the science of collaborative problem solving.
+\newblock \emph{Psychological Science in the Public Interest}, 19\penalty0 (2):\penalty0 59--92, 2018.
+\newblock \doi{10.1177/1529100618808244}.
+
+\bibitem[Griffin et~al.(2012)Griffin, McGaw, and Care]{griffin2012assessment}
+P.~Griffin, B.~McGaw, and E.~Care, editors.
+\newblock \emph{Assessment and Teaching of 21st Century Skills}.
+\newblock Springer, Dordrecht, 2012.
+\newblock \doi{10.1007/978-94-007-2324-5}.
+
+\bibitem[Hayes and Krippendorff(2007)]{hayes2007answering}
+A.~F. Hayes and K.~Krippendorff.
+\newblock Answering the call for a standard reliability measure for coding data.
+\newblock \emph{Communication Methods and Measures}, 1\penalty0 (1):\penalty0 77--89, 2007.
+\newblock \doi{10.1080/19312450709336664}.
+
+\bibitem[Hendrycks et~al.(2021)Hendrycks, Burns, Kadavath, Arora, Basart, Tang, Song, and Steinhardt]{hendrycks2021math}
+D.~Hendrycks, C.~Burns, S.~Kadavath, A.~Arora, S.~Basart, E.~Tang, D.~Song, and J.~Steinhardt.
+\newblock Measuring mathematical problem solving with the {MATH} dataset.
+\newblock In \emph{Proceedings of NeurIPS 2021 Datasets and Benchmarks Track}, 2021.
+
+\bibitem[Hong et~al.(2023)Hong, Zheng, Chen, Cheng, Wang, Zhang, Wang, Yau, Lin, Zhou, Ran, Xiao, Wu, and Schmidhuber]{hong2023metagpt}
+S.~Hong, X.~Zheng, J.~Chen, Y.~Cheng, J.~Wang, C.~Zhang, Z.~Wang, S.~K.~S. Yau, Z.~Lin, L.~Zhou, C.~Ran, L.~Xiao, C.~Wu, and J.~Schmidhuber.
+\newblock {MetaGPT}: Meta programming for a multi-agent collaborative framework.
+\newblock arXiv preprint arXiv:2308.00352, 2023.
+\newblock Published at ICLR 2024.
+
+\bibitem[Johnson and Johnson(2009)]{johnson2009cooperative}
+D.~W. Johnson and R.~T. Johnson.
+\newblock An educational psychology success story: Social interdependence theory and cooperative learning.
+\newblock \emph{Educational Researcher}, 38\penalty0 (5):\penalty0 365--379, 2009.
+\newblock \doi{10.3102/0013189X09339057}.
+
+\bibitem[Kapur(2016)]{kapur2016examining}
+M.~Kapur.
+\newblock Examining productive failure, productive success, unproductive failure, and unproductive success in learning.
+\newblock \emph{Educational Psychologist}, 51\penalty0 (2):\penalty0 289--299, 2016.
+\newblock \doi{10.1080/00461520.2016.1155457}.
+
+\bibitem[King(1992)]{king1992facilitating}
+A.~King.
+\newblock Facilitating elaborative learning through guided student-generated questioning.
+\newblock \emph{Educational Psychologist}, 27\penalty0 (1):\penalty0 111--126, 1992.
+
+\bibitem[Li et~al.(2023)Li, Hammoud, Itani, Khizbullin, and Ghanem]{li2023camel}
+G.~Li, H.~A. A.~K. Hammoud, H.~Itani, D.~Khizbullin, and B.~Ghanem.
+\newblock {CAMEL}: Communicative agents for ``mind'' exploration of large language model society.
+\newblock In \emph{Advances in Neural Information Processing Systems}, volume~36, 2023.
+
+\bibitem[Liang et~al.(2023)Liang, He, Jiao, Wang, Wang, Wang, Yang, Tu, and Shi]{liang2023encouraging}
+T.~Liang, Z.~He, W.~Jiao, X.~Wang, Y.~Wang, R.~Wang, Y.~Yang, Z.~Tu, and S.~Shi.
+\newblock Encouraging divergent thinking in large language models through multi-agent debate.
+\newblock arXiv preprint arXiv:2305.19118, 2023.
+
+\bibitem[{OECD}(2015)]{pisa2015cps}
+{OECD}.
+\newblock \emph{{PISA} 2015 Assessment and Analytical Framework: Science, Reading, Mathematics and Collaborative Problem Solving}.
+\newblock OECD Publishing, 2015.
+\newblock \doi{10.1787/9789264281820-en}.
+
+\bibitem[Park et~al.(2023)Park, O'Brien, Cai, Morris, Liang, and Bernstein]{park2023generative}
+J.~S. Park, J.~C. O'Brien, C.~J. Cai, M.~R. Morris, P.~Liang, and M.~S. Bernstein.
+\newblock Generative agents: Interactive simulacra of human behavior.
+\newblock In \emph{Proceedings of the 36th Annual ACM Symposium on User Interface Software and Technology (UIST '23)}, 2023.
+\newblock \doi{10.1145/3586183.3606763}.
+
+\bibitem[Qian et~al.(2023)Qian, Liu, Liu, Chen, Dang, Li, Yang, Chen, Su, Cong, Xu, Li, Liu, and Sun]{qian2023chatdev}
+C.~Qian, W.~Liu, H.~Liu, N.~Chen, Y.~Dang, J.~Li, C.~Yang, W.~Chen, Y.~Su, X.~Cong, J.~Xu, D.~Li, Z.~Liu, and M.~Sun.
+\newblock {ChatDev}: Communicative agents for software development.
+\newblock arXiv preprint arXiv:2307.07924, 2023.
+
+\bibitem[Rojas et~al.(2021)Rojas, Nussbaum, Chiuminatto, Guerrero, Greiff, Krieger, and Van Der~Westhuizen]{rojas2021assessing}
+M.~Rojas, M.~Nussbaum, P.~Chiuminatto, O.~Guerrero, S.~Greiff, F.~Krieger, and L.~Van Der~Westhuizen.
+\newblock Assessing collaborative problem-solving skills among elementary school students.
+\newblock \emph{Computers \& Education}, 175:\penalty0 104313, 2021.
+\newblock \doi{10.1016/j.compedu.2021.104313}.
+
+\bibitem[Roschelle and Teasley(1995)]{roschelle1995construction}
+J.~Roschelle and S.~D. Teasley.
+\newblock The construction of shared knowledge in collaborative problem solving.
+\newblock In C.~O'Malley, editor, \emph{Computer Supported Collaborative Learning}, pages 69--97. Springer, 1995.
+
+\bibitem[Swiecki(2021)]{swiecki2021measuring}
+Z.~Swiecki.
+\newblock Measuring the impact of interdependence on individuals during collaborative problem-solving.
+\newblock \emph{Journal of Learning Analytics}, 8\penalty0 (1):\penalty0 75--94, 2021.
+\newblock \doi{10.18608/jla.2021.7240}.
+
+\bibitem[Wu et~al.(2024)Wu, Bansal, Zhang, Wu, Li, Zhu, Jiang, Zhang, Zhang, Liu, Awadallah, White, Burger, and Wang]{wu2024autogen}
+Q.~Wu, G.~Bansal, J.~Zhang, Y.~Wu, B.~Li, E.~Zhu, L.~Jiang, X.~Zhang, S.~Zhang, J.~Liu, A.~H. Awadallah, R.~W. White, D.~Burger, and C.~Wang.
+\newblock {AutoGen}: Enabling next-generation {LLM} applications via multi-agent conversation.
+\newblock In \emph{Proceedings of the Conference on Language Modeling (COLM 2024)}, 2024.
+
+\bibitem[Zhou et~al.(2023)Zhou, Zhu, Mathur, Zhang, Yu, Qi, Morency, Bisk, Fried, Neubig, and Sap]{zhou2023sotopia}
+X.~Zhou, H.~Zhu, L.~Mathur, R.~Zhang, H.~Yu, Z.~Qi, L.-P. Morency, Y.~Bisk, D.~Fried, G.~Neubig, and M.~Sap.
+\newblock {SOTOPIA}: Interactive evaluation for social intelligence in language agents.
+\newblock arXiv preprint arXiv:2310.11667, 2023.
+\newblock Published at ICLR 2024.
+
+\end{thebibliography}
